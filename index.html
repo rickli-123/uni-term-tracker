@@ -1,0 +1,1405 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Geist+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<title>U.S. Agent Model University Coverage & Term Tracker</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  *, input, select, button, textarea { font-family: "Geist Mono", ui-monospace, monospace; }
+  body {
+    margin: 0;
+    font-family: "Geist Mono", ui-monospace, monospace;
+    background: #fafaf7;
+    color: #1a1a1a;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  header.app-header {
+    padding: 18px 22px 14px;
+    border-bottom: 1px solid #e6e3db;
+    background: #fff;
+    position: sticky; top: 0; z-index: 1001;
+  }
+  .app-header-top {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    margin-bottom: 4px;
+  }
+  header.app-header h1 {
+    margin: 0 0 4px;
+    font-size: 20px;
+    font-weight: 400;
+    letter-spacing: -0.3px;
+    font-family: "Fraunces", serif;
+  }
+  header.app-header .sub {
+    color: #6b6b6b;
+    font-size: 13px;
+  }
+  .view-switch {
+    display: inline-flex;
+    background: #f4f1ea;
+    border: 1px solid #e6e3db;
+    border-radius: 8px;
+    padding: 3px;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+  .view-switch button {
+    background: transparent; border: 0;
+    padding: 5px 16px; font-size: 12px; cursor: pointer;
+    color: #6b6b6b; border-radius: 5px; font-weight: 500;
+    font-family: "Geist Mono", ui-monospace, monospace;
+    transition: background 0.15s, color 0.15s;
+  }
+  .view-switch button.active {
+    background: #fff; color: #1a1a1a;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  .stats {
+    display: flex; flex-wrap: wrap; gap: 14px;
+    margin-top: 12px;
+  }
+  .stat {
+    background: #f4f1ea;
+    border: 1px solid #e6e3db;
+    border-radius: 8px;
+    padding: 10px 14px;
+    min-width: 140px;
+  }
+  .stat .num { font-size: 22px; font-weight: 600; color: #1a1a1a; }
+  .stat .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #6b6b6b; margin-top: 2px; }
+  .stat.pri .num { color: #b44a1a; }
+  .stat.alt .num { color: #2f6b3a; }
+
+  .controls {
+    padding: 12px 22px;
+    background: #fff;
+    border-bottom: 1px solid #e6e3db;
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    position: sticky; z-index: 1000;
+  }
+  .controls input[type=search],
+  .controls select {
+    background: #fff;
+    border: 1px solid #d6d3cb;
+    border-radius: 6px;
+    padding: 6px 9px;
+    font-size: 13px;
+    color: #1a1a1a;
+  }
+  .controls input[type=search] { min-width: 220px; }
+  .controls .seg {
+    display: inline-flex;
+    border: 1px solid #d6d3cb;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .controls .seg button {
+    background: #fff; border: 0; padding: 6px 12px; font-size: 13px; cursor: pointer; color: #1a1a1a;
+  }
+  .controls .seg button.active { background: #1a1a1a; color: #fff; }
+  .controls .right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .controls button.action {
+    background: #fff; border: 1px solid #d6d3cb; border-radius: 6px; padding: 6px 11px; cursor: pointer; font-size: 13px; color: #1a1a1a;
+  }
+  .controls button.action:hover { background: #f4f1ea; }
+
+  main { padding: 16px 22px 80px; }
+
+  /* Table view */
+  table.cal {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    border: 1px solid #e6e3db;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  table.cal th, table.cal td { text-align: left; padding: 9px 12px; border-bottom: 1px solid #efece4; vertical-align: top; }
+  table.cal th { background: #f4f1ea; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; color: #5a5a5a; cursor: pointer; user-select: none; }
+  table.cal th .arrow { color: #b44a1a; margin-left: 4px; }
+  table.cal tr:last-child td { border-bottom: 0; }
+  table.cal tr:hover td { background: #fbfaf5; }
+  .pill {
+    display: inline-block;
+    padding: 2px 8px;
+    font-size: 11px;
+    border-radius: 999px;
+    font-weight: 500;
+    border: 1px solid transparent;
+    white-space: nowrap;
+  }
+  .pill.in-session { background: #e3efd9; color: #2f6b3a; border-color: #cbe0bb; }
+  .pill.finals { background: #fde9d3; color: #b44a1a; border-color: #f4d3a8; }
+  .pill.break { background: #ecebe5; color: #5a5a5a; border-color: #d6d3cb; }
+  .pill.summer { background: #e0eaf3; color: #2c5b85; border-color: #c5d8ea; }
+  .pill.system { background: #fff; color: #5a5a5a; border-color: #d6d3cb; }
+  .pill.type { background: #fff; color: #5a5a5a; border-color: #d6d3cb; }
+  td.days { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td .uni-name { font-weight: 500; }
+  td .uni-meta { color: #6b6b6b; font-size: 12px; }
+  td .terms { color: #6b6b6b; font-size: 12px; margin-top: 2px; }
+  td a { color: #2c5b85; text-decoration: none; }
+  td a:hover { text-decoration: underline; }
+  td.editable input { width: 110px; padding: 3px 5px; border: 1px solid #d6d3cb; border-radius: 4px; font-size: 12px; font-family: inherit; }
+  td.coverage { vertical-align: middle; min-width: 160px; }
+  .ti-bubbles { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+  .ti-bubble {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 9px; font-weight: 700; cursor: pointer; letter-spacing: 0.3px;
+    transition: transform 0.1s, opacity 0.1s;
+    user-select: none;
+  }
+  .ti-bubble:hover { transform: scale(1.15); opacity: 0.85; }
+  .edited { background: #fff7e0 !important; }
+
+  /* Timeline view */
+  .timeline {
+    background: #fff;
+    border: 1px solid #e6e3db;
+    border-radius: 8px;
+    padding: 0;
+    overflow: hidden;
+  }
+  .tl-axis {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    border-bottom: 1px solid #e6e3db;
+    background: #f4f1ea;
+    position: sticky; top: 0; z-index: 2;
+  }
+  .tl-axis .left { padding: 8px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; color: #5a5a5a; font-weight: 600; }
+  .tl-axis .right { position: relative; height: 28px; }
+  .tl-month {
+    position: absolute; top: 0; bottom: 0;
+    border-left: 1px solid #e6e3db;
+    padding: 6px 5px; font-size: 11px; color: #6b6b6b;
+  }
+  .tl-row {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    border-bottom: 1px solid #efece4;
+    min-height: 32px;
+  }
+  .tl-row:hover { background: #fbfaf5; }
+  .tl-row .label { padding: 6px 12px; font-size: 12px; }
+  .tl-row .label .uni-name { font-weight: 500; }
+  .tl-row .label .uni-meta { color: #6b6b6b; font-size: 11px; }
+  .tl-row .track { position: relative; }
+  .term-bar {
+    position: absolute; top: 6px; height: 18px;
+    border-radius: 4px; padding: 1px 6px; font-size: 11px;
+    color: #1a1a1a; white-space: nowrap; overflow: hidden;
+    border: 1px solid;
+  }
+  .term-bar.spring { background: #e3efd9; border-color: #cbe0bb; color: #2f6b3a; }
+  .term-bar.summer { background: #e0eaf3; border-color: #c5d8ea; color: #2c5b85; }
+  .term-bar.fall { background: #f4e4c2; border-color: #e7d09c; color: #6b4d1a; }
+  .term-bar.winter { background: #ecebe5; border-color: #d6d3cb; color: #5a5a5a; }
+  .term-bar.finals { background: #fde9d3; border-color: #f4d3a8; color: #b44a1a; }
+  .tl-today {
+    position: absolute; top: 0; bottom: 0; width: 0; border-left: 2px solid #b44a1a;
+    z-index: 3; pointer-events: none;
+  }
+  .tl-today .lbl {
+    position: absolute; top: -22px; left: 4px; background: #b44a1a; color: #fff; padding: 1px 6px;
+    font-size: 10px; border-radius: 3px; white-space: nowrap;
+  }
+
+  .empty { padding: 30px; text-align: center; color: #6b6b6b; }
+
+  /* Map view */
+  #map-container { display: none; padding: 16px 22px 20px; position: relative; background: #fafaf7; }
+  #leaflet-map { border-radius: 14px; border: 1px solid #e6e3db; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+
+  .footer-note { padding: 12px 22px; color: #6b6b6b; font-size: 11px; border-top: 1px solid #e6e3db; background: #fff; }
+  details.disclosure { margin-top: 6px; }
+  details.disclosure summary { cursor: pointer; color: #2c5b85; font-size: 12px; }
+
+  /* Toast */
+  #toast {
+    position: fixed; bottom: 20px; right: 20px;
+    background: #1a1a1a; color: #fff;
+    padding: 10px 14px; border-radius: 6px; font-size: 13px;
+    opacity: 0; pointer-events: none; transition: opacity 0.2s;
+    z-index: 50;
+  }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<header class="app-header" id="appHeader">
+  <div class="app-header-top">
+    <div>
+      <h1>U.S. Agent Model University Coverage & Term Tracker</h1>
+      <div class="sub" id="subtitle">Loading…</div>
+    </div>
+    <div class="view-switch" id="viewSeg">
+      <button data-view="map" class="active">Map</button>
+      <button data-view="table">List</button>
+    </div>
+  </div>
+  <div class="stats" id="stats"></div>
+</header>
+
+<div class="controls" id="controls" style="display:none">
+  <input type="search" id="search" placeholder="Search by institution or city…" />
+  <select id="metroFilter"><option value="">All metros</option></select>
+  <select id="systemFilter">
+    <option value="">All calendar systems</option>
+    <option value="semester">Semester</option>
+    <option value="quarter">Quarter</option>
+    <option value="trimester">Trimester</option>
+  </select>
+  <select id="statusFilter">
+    <option value="">All statuses</option>
+    <option value="in-session">In session today</option>
+    <option value="finals">In finals</option>
+    <option value="break">On break / Between terms</option>
+    <option value="summer">In summer term</option>
+  </select>
+  <select id="tiFilter">
+    <option value="">All TI coverage</option>
+  </select>
+  <div class="right">
+    <button class="action" id="exportEdits">Export edits</button>
+    <button class="action" id="resetEdits">Reset edits</button>
+  </div>
+</div>
+
+<main id="view"></main>
+
+<div id="map-container">
+  <div id="leaflet-map"></div>
+</div>
+
+<div class="footer-note">
+  Dates reflect each institution's primary undergraduate academic calendar at its main campus.
+  Data last reviewed: May 2, 2026. Always click the row's "official calendar ↗" link to confirm before relying on a date — registrar pages are the source of truth and may have changed since this review.
+  Edits you make are saved to your browser only — use Export edits to keep a copy.
+  <details class="disclosure">
+    <summary>What's verified vs. estimated, and how dates were sourced</summary>
+    <p style="margin:6px 0 4px"><strong>Directly verified during the most recent review (~70 schools):</strong> URL and Spring/Fall 2026 dates checked against each institution's registrar page or PDF calendar. Includes Columbia, NYU, Yale, Princeton, UCLA, USC, Caltech, Pomona, Cal State LA, Cal State Long Beach, UChicago, Northwestern, SMU, UT Dallas, Rice, UT Austin, Emory, Georgia Tech, Spelman, Morehouse, Georgetown, GWU, Penn, Bryn Mawr, Swarthmore, U Miami, FIU, ASU, Maricopa, Harvard, MIT, BC, BU, Tufts, Northeastern, Berkeley, Stanford, UCSF, USF (SF), UCSD, SDSU, USD, U Washington, Seattle U, U Minnesota, U St Thomas, U Michigan, MSU, Wayne State, U Detroit Mercy, CU Boulder, Colo School of Mines, JHU, UMBC, Loyola Maryland, WashU, Webster, UCF, UNCC, UTSA, Trinity (TX), Portland State, Reed, Lewis &amp; Clark, Oregon State, U Oregon, UC Riverside, Penn State, LACCD.</p>
+    <p style="margin:6px 0 4px"><strong>Template-based (~255 schools):</strong> Schools sharing a calendar pattern with a verified peer (e.g., other Cal State campuses use the same dates as Cal State LA; other UC quarter campuses match UCLA). These should be accurate within ±1 week but may have small term-specific differences.</p>
+    <p style="margin:6px 0 4px"><strong>Coverage:</strong> All R1/R2 universities, flagship publics, major privates, large community college districts, and notable specialty schools across the 25 most populous U.S. metro areas (325 institutions). Community college districts are listed as a single row when member campuses share one calendar (LACCD, CUNY, Maricopa, Dallas College, etc.).</p>
+  </details>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ======================================================
+// DATASET
+// Format: { name, city (metro), state, type, system, url, terms: { "Spring 2026": {start, end}, ... } }
+// Dates are ISO YYYY-MM-DD. End dates are the last day of the term (typically end of finals).
+// Term names are normalized: "Winter 2026", "Spring 2026", "Summer 2026", "Fall 2026"
+// ======================================================
+// === Calendar templates (used to keep entries terse) ===
+// Note: Dates reflect publicly available academic calendars at each institution's main campus.
+// "End" is the last day of finals (or last class day for schools without finals).
+
+// Standard semester (most semester schools)
+const TPL_SEM_STD = { "Spring 2026": {start:"2026-01-12",end:"2026-05-08"}, "Summer 2026": {start:"2026-05-18",end:"2026-08-07"}, "Fall 2026": {start:"2026-08-24",end:"2026-12-18"} };
+// Ivy / late-start semester (Columbia/NYU style)
+const TPL_SEM_LATE = { "Spring 2026": {start:"2026-01-20",end:"2026-05-15"}, "Summer 2026": {start:"2026-05-26",end:"2026-08-14"}, "Fall 2026": {start:"2026-09-08",end:"2026-12-21"} };
+// Texas / Southern semester
+const TPL_SEM_TX = { "Spring 2026": {start:"2026-01-12",end:"2026-05-04"}, "Summer 2026": {start:"2026-06-01",end:"2026-08-14"}, "Fall 2026": {start:"2026-08-24",end:"2026-12-14"} };
+// California State semester
+const TPL_SEM_CSU = { "Spring 2026": {start:"2026-01-20",end:"2026-05-22"}, "Summer 2026": {start:"2026-06-01",end:"2026-08-14"}, "Fall 2026": {start:"2026-08-24",end:"2026-12-18"} };
+// California Community College (LACCD-style late spring)
+const TPL_SEM_CACC = { "Spring 2026": {start:"2026-02-09",end:"2026-06-08"}, "Summer 2026": {start:"2026-06-15",end:"2026-08-07"}, "Fall 2026": {start:"2026-08-24",end:"2026-12-18"} };
+// UC Quarter (UCLA-style)
+const TPL_QTR_UC = { "Winter 2026": {start:"2026-01-05",end:"2026-03-20"}, "Spring 2026": {start:"2026-03-30",end:"2026-06-12"}, "Summer 2026": {start:"2026-06-22",end:"2026-09-11"}, "Fall 2026": {start:"2026-09-21",end:"2026-12-11"} };
+// Stanford / private quarter
+const TPL_QTR_PRIV = { "Winter 2026": {start:"2026-01-05",end:"2026-03-20"}, "Spring 2026": {start:"2026-03-30",end:"2026-06-10"}, "Summer 2026": {start:"2026-06-22",end:"2026-08-14"}, "Fall 2026": {start:"2026-09-21",end:"2026-12-11"} };
+// UChicago quarter
+const TPL_QTR_UCHI = { "Winter 2026": {start:"2026-01-05",end:"2026-03-21"}, "Spring 2026": {start:"2026-03-23",end:"2026-06-06"}, "Summer 2026": {start:"2026-06-15",end:"2026-09-04"}, "Fall 2026": {start:"2026-09-28",end:"2026-12-12"} };
+// Northwestern quarter (verified: Spring '26 classes end Jun 6, finals Jun 8-12)
+const TPL_QTR_NW = { "Winter 2026": {start:"2026-01-05",end:"2026-03-21"}, "Spring 2026": {start:"2026-03-30",end:"2026-06-12"}, "Summer 2026": {start:"2026-06-22",end:"2026-08-29"}, "Fall 2026": {start:"2026-09-15",end:"2026-12-12"} };
+// UW Seattle quarter
+const TPL_QTR_UW = { "Winter 2026": {start:"2026-01-05",end:"2026-03-20"}, "Spring 2026": {start:"2026-03-30",end:"2026-06-12"}, "Summer 2026": {start:"2026-06-22",end:"2026-08-21"}, "Fall 2026": {start:"2026-09-23",end:"2026-12-11"} };
+// Block plan (Colorado College etc.) - simplified to semester for status
+const TPL_BLOCK = { "Spring 2026": {start:"2026-01-26",end:"2026-05-13"}, "Fall 2026": {start:"2026-08-24",end:"2026-12-18"} };
+
+const cp = (o) => JSON.parse(JSON.stringify(o));
+
+// =====================================================================
+// 1. NEW YORK – NEWARK – JERSEY CITY  (NY/NJ/PA)
+// =====================================================================
+const NYC = "New York";
+const NYC_INSTS = [
+  { name:"Columbia University", city:NYC, state:"NY", type:"Private R1", system:"semester", url:"https://registrar.columbia.edu/content/academic-calendar", terms: cp(TPL_SEM_LATE) },
+  { name:"New York University (NYU)", city:NYC, state:"NY", type:"Private R1", system:"semester", url:"https://www.nyu.edu/students/student-information-and-resources/registration-records-and-graduation/academic-calendar.html", terms: cp(TPL_SEM_LATE) },
+  { name:"Cornell Tech (Roosevelt Island)", city:NYC, state:"NY", type:"Private R1", system:"semester", url:"https://tech.cornell.edu/admissions-aid/academic-calendar/", terms: cp(TPL_SEM_LATE) },
+  { name:"Fordham University", city:NYC, state:"NY", type:"Private R1", system:"semester", url:"https://www.fordham.edu/academics/academic-resources/academic-calendar/", terms: cp(TPL_SEM_LATE) },
+  { name:"The New School", city:NYC, state:"NY", type:"Private", system:"semester", url:"https://www.newschool.edu/registrar/academic-calendar/", terms: cp(TPL_SEM_LATE) },
+  { name:"Pace University", city:NYC, state:"NY", type:"Private", system:"semester", url:"https://www.pace.edu/registrar/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Cooper Union", city:NYC, state:"NY", type:"Private", system:"semester", url:"https://cooper.edu/students/student-affairs/academic-calendar", terms: cp(TPL_SEM_LATE) },
+  { name:"Yeshiva University", city:NYC, state:"NY", type:"Private R2", system:"semester", url:"https://www.yu.edu/registrar/calendar", terms: cp(TPL_SEM_LATE) },
+  { name:"Stevens Institute of Technology", city:NYC, state:"NJ", type:"Private R2", system:"semester", url:"https://www.stevens.edu/page-academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Hofstra University", city:NYC, state:"NY", type:"Private R2", system:"semester", url:"https://www.hofstra.edu/registrar/academic-calendar.html", terms: cp(TPL_SEM_STD) },
+  { name:"Adelphi University", city:NYC, state:"NY", type:"Private", system:"semester", url:"https://www.adelphi.edu/registrar/academic-calendars/", terms: cp(TPL_SEM_STD) },
+  { name:"St. John's University", city:NYC, state:"NY", type:"Private R2", system:"semester", url:"https://www.stjohns.edu/academics/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Long Island University (Brooklyn/Post)", city:NYC, state:"NY", type:"Private", system:"semester", url:"https://www.liu.edu/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Manhattan College", city:NYC, state:"NY", type:"Private", system:"semester", url:"https://manhattan.edu/registrar/calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Iona University", city:NYC, state:"NY", type:"Private", system:"semester", url:"https://www.iona.edu/academics/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Sarah Lawrence College", city:NYC, state:"NY", type:"Private LAC", system:"semester", url:"https://www.sarahlawrence.edu/registrar/academic-calendar/", terms: cp(TPL_SEM_LATE) },
+  { name:"CUNY (City University of New York system)", city:NYC, state:"NY", type:"Public — system", system:"semester", url:"https://www.cuny.edu/academics/academic-calendar/", terms: cp(TPL_SEM_LATE) },
+  { name:"Stony Brook University (SUNY)", city:NYC, state:"NY", type:"Public R1", system:"semester", url:"https://www.stonybrook.edu/registrar/calendars/", terms: cp(TPL_SEM_LATE) },
+  { name:"SUNY Maritime College", city:NYC, state:"NY", type:"Public", system:"semester", url:"https://www.sunymaritime.edu/registrar/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"SUNY Old Westbury", city:NYC, state:"NY", type:"Public", system:"semester", url:"https://www.oldwestbury.edu/academics/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Rutgers University–New Brunswick", city:NYC, state:"NJ", type:"Public R1", system:"semester", url:"https://scheduling.rutgers.edu/scheduling/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Rutgers University–Newark", city:NYC, state:"NJ", type:"Public R1", system:"semester", url:"https://scheduling.rutgers.edu/scheduling/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"New Jersey Institute of Technology (NJIT)", city:NYC, state:"NJ", type:"Public R1", system:"semester", url:"https://www.njit.edu/registrar/calendars", terms: cp(TPL_SEM_STD) },
+  { name:"Seton Hall University", city:NYC, state:"NJ", type:"Private R2", system:"semester", url:"https://www.shu.edu/registrar/calendars-deadlines.html", terms: cp(TPL_SEM_STD) },
+  { name:"Montclair State University", city:NYC, state:"NJ", type:"Public R2", system:"semester", url:"https://www.montclair.edu/registrar/academic-calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"William Paterson University", city:NYC, state:"NJ", type:"Public", system:"semester", url:"https://www.wpunj.edu/registrar/academic-calendar.html", terms: cp(TPL_SEM_STD) },
+  { name:"Kean University", city:NYC, state:"NJ", type:"Public", system:"semester", url:"https://www.kean.edu/offices/registrars-office/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Princeton University", city:NYC, state:"NJ", type:"Private R1", system:"semester", url:"https://registrar.princeton.edu/academic-calendar", terms: cp(TPL_SEM_LATE) },
+  { name:"Yale University", city:NYC, state:"CT", type:"Private R1", system:"semester", url:"https://registrar.yale.edu/calendar", terms: cp(TPL_SEM_LATE) },
+];
+
+// =====================================================================
+// 2. LOS ANGELES – LONG BEACH – ANAHEIM
+// =====================================================================
+const LA = "Los Angeles";
+const LA_INSTS = [
+  { name:"University of California, Los Angeles (UCLA)", city:LA, state:"CA", type:"Public R1", system:"quarter", url:"https://registrar.ucla.edu/calendars/annual-academic-calendar", terms: cp(TPL_QTR_UC) },
+  { name:"University of California, Irvine (UCI)", city:LA, state:"CA", type:"Public R1", system:"quarter", url:"https://www.reg.uci.edu/calendars/quarterly/", terms: cp(TPL_QTR_UC) },
+  { name:"University of California, Riverside (UCR)", city:LA, state:"CA", type:"Public R1", system:"quarter", url:"https://registrar.ucr.edu/calendar", terms: cp(TPL_QTR_UC) },
+  { name:"University of Southern California (USC)", city:LA, state:"CA", type:"Private R1", system:"semester", url:"https://www.usc.edu/academic-calendar/", terms: { "Spring 2026":{start:"2026-01-12",end:"2026-05-08"}, "Summer 2026":{start:"2026-05-18",end:"2026-08-07"}, "Fall 2026":{start:"2026-08-24",end:"2026-12-12"} } },
+  { name:"California Institute of Technology (Caltech)", city:LA, state:"CA", type:"Private R1", system:"quarter", url:"https://www.registrar.caltech.edu/calendars/academic-calendar", terms: cp(TPL_QTR_PRIV) },
+  { name:"Loyola Marymount University", city:LA, state:"CA", type:"Private R2", system:"semester", url:"https://registrar.lmu.edu/academiccalendar/", terms: cp(TPL_SEM_CSU) },
+  { name:"Pepperdine University", city:LA, state:"CA", type:"Private R2", system:"semester", url:"https://www.pepperdine.edu/registrar/academic-calendar/", terms: cp(TPL_SEM_CSU) },
+  { name:"Occidental College", city:LA, state:"CA", type:"Private LAC", system:"semester", url:"https://www.oxy.edu/registrar/academic-calendar", terms: cp(TPL_SEM_CSU) },
+  { name:"Claremont Colleges (Pomona, Claremont McKenna, Harvey Mudd, Pitzer, Scripps)", city:LA, state:"CA", type:"Private LAC consortium", system:"semester", url:"https://catalog.pomona.edu/calendar", terms: { "Spring 2026":{start:"2026-01-20",end:"2026-05-15"}, "Fall 2026":{start:"2026-08-31",end:"2026-12-18"} } },
+  { name:"Cal State Long Beach", city:LA, state:"CA", type:"Public", system:"semester", url:"https://www.csulb.edu/academic-affairs/academic-affairs-calendar", terms: cp(TPL_SEM_CSU) },
+  { name:"Cal State Los Angeles", city:LA, state:"CA", type:"Public", system:"semester", url:"https://www.calstatela.edu/academicresources/academic-calendar", terms: cp(TPL_SEM_CSU) },
+  { name:"Cal State Fullerton", city:LA, state:"CA", type:"Public", system:"semester", url:"https://www.fullerton.edu/registrar/academic_calendar/", terms: cp(TPL_SEM_CSU) },
+  { name:"Cal State Northridge", city:LA, state:"CA", type:"Public", system:"semester", url:"https://catalog.csun.edu/academics/academic-calendar/", terms: cp(TPL_SEM_CSU) },
+  { name:"Cal Poly Pomona", city:LA, state:"CA", type:"Public", system:"semester", url:"https://www.cpp.edu/registrar/academic-calendar/", terms: cp(TPL_SEM_CSU) },
+  { name:"Cal State Dominguez Hills", city:LA, state:"CA", type:"Public", system:"semester", url:"https://www.csudh.edu/registrar/academic-calendar/", terms: cp(TPL_SEM_CSU) },
+  { name:"LACCD (Los Angeles Community College District)", city:LA, state:"CA", type:"Public — system", system:"semester", url:"https://www.laccd.edu/", terms: cp(TPL_SEM_CACC) },
+  { name:"Pasadena City College", city:LA, state:"CA", type:"Public CC", system:"semester", url:"https://pasadena.edu/academics/academic-calendar/", terms: cp(TPL_SEM_CACC) },
+  { name:"Santa Monica College", city:LA, state:"CA", type:"Public CC", system:"semester", url:"https://www.smc.edu/admission-aid/academic-calendar.php", terms: cp(TPL_SEM_CACC) },
+  { name:"ArtCenter College of Design", city:LA, state:"CA", type:"Private specialty", system:"trimester", url:"https://www.artcenter.edu/about/get-to-know-artcenter/calendar.html", terms: { "Spring 2026":{start:"2026-01-12",end:"2026-04-17"}, "Summer 2026":{start:"2026-04-27",end:"2026-08-07"}, "Fall 2026":{start:"2026-08-31",end:"2026-12-11"} } },
+  { name:"Otis College of Art and Design", city:LA, state:"CA", type:"Private specialty", system:"semester", url:"https://www.otis.edu/registration/academic-calendar", terms: cp(TPL_SEM_CSU) },
+  { name:"American Film Institute (AFI Conservatory)", city:LA, state:"CA", type:"Private specialty", system:"trimester", url:"https://www.afi.com/conservatory/", terms: cp(TPL_SEM_CSU) },
+];
+
+// =====================================================================
+// 3. CHICAGO – NAPERVILLE – ELGIN (IL/IN/WI)
+// =====================================================================
+const CHI = "Chicago";
+const CHI_INSTS = [
+  { name:"University of Chicago", city:CHI, state:"IL", type:"Private R1", system:"quarter", url:"https://registrar.uchicago.edu/calendars/", terms: cp(TPL_QTR_UCHI) },
+  { name:"Northwestern University", city:CHI, state:"IL", type:"Private R1", system:"quarter", url:"https://www.registrar.northwestern.edu/calendars/academic-calendars/", terms: cp(TPL_QTR_NW) },
+  { name:"University of Illinois Chicago (UIC)", city:CHI, state:"IL", type:"Public R1", system:"semester", url:"https://catalog.uic.edu/ucat/academic-calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Illinois Institute of Technology", city:CHI, state:"IL", type:"Private R1", system:"semester", url:"https://www.iit.edu/registrar/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"DePaul University", city:CHI, state:"IL", type:"Private R2", system:"quarter", url:"https://www.depaul.edu/academics/Pages/academic-calendar.aspx", terms: cp(TPL_QTR_NW) },
+  { name:"Loyola University Chicago", city:CHI, state:"IL", type:"Private R1", system:"semester", url:"https://www.luc.edu/academics/schedules/", terms: cp(TPL_SEM_STD) },
+  { name:"Roosevelt University", city:CHI, state:"IL", type:"Private", system:"semester", url:"https://www.roosevelt.edu/current-students/registration/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Columbia College Chicago", city:CHI, state:"IL", type:"Private", system:"semester", url:"https://www.colum.edu/columbia-central/where-to-start/semester-dates-deadlines", terms: cp(TPL_SEM_STD) },
+  { name:"School of the Art Institute of Chicago (SAIC)", city:CHI, state:"IL", type:"Private specialty", system:"semester", url:"https://www.saic.edu/academics/academic-calendar", terms: cp(TPL_SEM_LATE) },
+  { name:"Northeastern Illinois University", city:CHI, state:"IL", type:"Public", system:"semester", url:"https://www.neiu.edu/academic-affairs/academic-records/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Chicago State University", city:CHI, state:"IL", type:"Public", system:"semester", url:"https://www.csu.edu/registrar/academic-calendars.htm", terms: cp(TPL_SEM_STD) },
+  { name:"Governors State University", city:CHI, state:"IL", type:"Public", system:"trimester", url:"https://www.govst.edu/registrar/", terms: cp(TPL_SEM_STD) },
+  { name:"Northern Illinois University", city:CHI, state:"IL", type:"Public R2", system:"semester", url:"https://www.niu.edu/registrar/calendar/index.shtml", terms: cp(TPL_SEM_STD) },
+  { name:"City Colleges of Chicago (CCC)", city:CHI, state:"IL", type:"Public — system", system:"semester", url:"https://www.ccc.edu/menu/Pages/Academic-Calendar.aspx", terms: cp(TPL_SEM_STD) },
+  { name:"Wheaton College (IL)", city:CHI, state:"IL", type:"Private LAC", system:"semester", url:"https://www.wheaton.edu/academics/academic-resources/registrar/academic-calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Lake Forest College", city:CHI, state:"IL", type:"Private LAC", system:"semester", url:"https://www.lakeforest.edu/academics/academic-calendar", terms: cp(TPL_SEM_LATE) },
+  { name:"Lewis University", city:CHI, state:"IL", type:"Private", system:"semester", url:"https://www.lewisu.edu/academics/calendar.htm", terms: cp(TPL_SEM_STD) },
+  { name:"Dominican University (River Forest)", city:CHI, state:"IL", type:"Private", system:"semester", url:"https://www.dom.edu/academics/registrar/calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Concordia University Chicago", city:CHI, state:"IL", type:"Private", system:"semester", url:"https://www.cuchicago.edu/academics/academic-calendar/", terms: cp(TPL_SEM_STD) },
+];
+
+// =====================================================================
+// 4. DALLAS – FORT WORTH – ARLINGTON
+// =====================================================================
+const DFW = "Dallas-Fort Worth";
+const DFW_INSTS = [
+  { name:"Southern Methodist University (SMU)", city:DFW, state:"TX", type:"Private R1", system:"semester", url:"https://www.smu.edu/enrollment-services/registrar/academic-calendar", terms: { "Spring 2026":{start:"2026-01-20",end:"2026-05-08"}, "Summer 2026":{start:"2026-06-01",end:"2026-08-14"}, "Fall 2026":{start:"2026-08-24",end:"2026-12-19"} } },
+  { name:"University of Texas at Dallas (UTD)", city:DFW, state:"TX", type:"Public R1", system:"semester", url:"https://www.utdallas.edu/academics/calendar/", terms: cp(TPL_SEM_TX) },
+  { name:"University of Texas at Arlington (UTA)", city:DFW, state:"TX", type:"Public R1", system:"semester", url:"https://www.uta.edu/academics/academic-calendar", terms: cp(TPL_SEM_TX) },
+  { name:"University of North Texas (UNT)", city:DFW, state:"TX", type:"Public R1", system:"semester", url:"https://registrar.unt.edu/registration/academic-calendar", terms: cp(TPL_SEM_TX) },
+  { name:"Texas Christian University (TCU)", city:DFW, state:"TX", type:"Private R2", system:"semester", url:"https://www.tcu.edu/academic-calendar.php", terms: cp(TPL_SEM_TX) },
+  { name:"Texas Woman's University", city:DFW, state:"TX", type:"Public R2", system:"semester", url:"https://twu.edu/registrar/academic-calendars/", terms: cp(TPL_SEM_TX) },
+  { name:"University of Dallas", city:DFW, state:"TX", type:"Private", system:"semester", url:"https://udallas.edu/registrar/calendar/", terms: cp(TPL_SEM_TX) },
+  { name:"Dallas Baptist University", city:DFW, state:"TX", type:"Private", system:"semester", url:"https://www.dbu.edu/registrar/academic-calendar.html", terms: cp(TPL_SEM_TX) },
+  { name:"Texas Wesleyan University", city:DFW, state:"TX", type:"Private", system:"semester", url:"https://txwes.edu/academics/registrar/academic-calendar/", terms: cp(TPL_SEM_TX) },
+  { name:"Dallas College", city:DFW, state:"TX", type:"Public — system", system:"semester", url:"https://www.dallascollege.edu/admissions/enrollment/Pages/academic-calendar.aspx", terms: cp(TPL_SEM_TX) },
+  { name:"Tarrant County College", city:DFW, state:"TX", type:"Public — system", system:"semester", url:"https://www.tccd.edu/academics/calendar/", terms: cp(TPL_SEM_TX) },
+  { name:"Collin College", city:DFW, state:"TX", type:"Public CC", system:"semester", url:"https://www.collin.edu/academics/calendar.html", terms: cp(TPL_SEM_TX) },
+];
+
+// =====================================================================
+// 5. HOUSTON – THE WOODLANDS – SUGAR LAND
+// =====================================================================
+const HOU = "Houston";
+const HOU_INSTS = [
+  { name:"Rice University", city:HOU, state:"TX", type:"Private R1", system:"semester", url:"https://registrar.rice.edu/calendars", terms: { "Spring 2026":{start:"2026-01-12",end:"2026-05-04"}, "Fall 2026":{start:"2026-08-24",end:"2026-12-15"} } },
+  { name:"University of Houston (UH)", city:HOU, state:"TX", type:"Public R1", system:"semester", url:"https://uh.edu/academic-calendar/", terms: cp(TPL_SEM_TX) },
+  { name:"University of Houston–Downtown", city:HOU, state:"TX", type:"Public", system:"semester", url:"https://www.uhd.edu/registrar/", terms: cp(TPL_SEM_TX) },
+  { name:"University of Houston–Clear Lake", city:HOU, state:"TX", type:"Public", system:"semester", url:"https://www.uhcl.edu/about/administrative-offices/registrar/academic-calendar", terms: cp(TPL_SEM_TX) },
+  { name:"Texas Southern University", city:HOU, state:"TX", type:"Public R2", system:"semester", url:"https://www.tsu.edu/academics/calendar.html", terms: cp(TPL_SEM_TX) },
+  { name:"Prairie View A&M University", city:HOU, state:"TX", type:"Public R2", system:"semester", url:"https://www.pvamu.edu/registrar/academic-calendar/", terms: cp(TPL_SEM_TX) },
+  { name:"Sam Houston State University", city:HOU, state:"TX", type:"Public R2", system:"semester", url:"https://www.shsu.edu/dept/registrar/academic-calendar.html", terms: cp(TPL_SEM_TX) },
+  { name:"Houston Christian University", city:HOU, state:"TX", type:"Private", system:"semester", url:"https://hc.edu/academics/registrar/academic-calendar/", terms: cp(TPL_SEM_TX) },
+  { name:"University of St. Thomas (Houston)", city:HOU, state:"TX", type:"Private", system:"semester", url:"https://www.stthom.edu/Public/index.asp?Page_ID=2024", terms: cp(TPL_SEM_TX) },
+  { name:"Lone Star College System", city:HOU, state:"TX", type:"Public — system", system:"semester", url:"https://www.lonestar.edu/academic-calendar.htm", terms: cp(TPL_SEM_TX) },
+  { name:"Houston Community College (HCC)", city:HOU, state:"TX", type:"Public — system", system:"semester", url:"https://www.hccs.edu/resources-for/current-students/academic-calendar/", terms: cp(TPL_SEM_TX) },
+  { name:"San Jacinto College", city:HOU, state:"TX", type:"Public CC", system:"semester", url:"https://www.sanjac.edu/about/calendar/academic-calendar", terms: cp(TPL_SEM_TX) },
+];
+
+// =====================================================================
+// 6. ATLANTA – SANDY SPRINGS – ALPHARETTA
+// =====================================================================
+const ATL = "Atlanta";
+const ATL_INSTS = [
+  { name:"Emory University", city:ATL, state:"GA", type:"Private R1", system:"semester", url:"https://registrar.emory.edu/academic-calendar/index.html", terms: cp(TPL_SEM_STD) },
+  { name:"Georgia Institute of Technology (Georgia Tech)", city:ATL, state:"GA", type:"Public R1", system:"semester", url:"https://registrar.gatech.edu/calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Georgia State University", city:ATL, state:"GA", type:"Public R1", system:"semester", url:"https://registrar.gsu.edu/registration/academic-calendars/", terms: cp(TPL_SEM_STD) },
+  { name:"Kennesaw State University", city:ATL, state:"GA", type:"Public R2", system:"semester", url:"https://registrar.kennesaw.edu/calendars/", terms: cp(TPL_SEM_STD) },
+  { name:"University of Georgia (UGA — Athens)", city:ATL, state:"GA", type:"Public R1", system:"semester", url:"https://reg.uga.edu/general-information/calendars/academic-calendars/", terms: cp(TPL_SEM_STD) },
+  { name:"Spelman College", city:ATL, state:"GA", type:"Private LAC HBCU", system:"semester", url:"https://www.spelman.edu/academics/academic-calendar.html", terms: cp(TPL_SEM_STD) },
+  { name:"Morehouse College", city:ATL, state:"GA", type:"Private LAC HBCU", system:"semester", url:"https://morehouse.edu/academics/calendars/traditional-student-academic-calendar-2025-2026", terms: cp(TPL_SEM_STD) },
+  { name:"Clark Atlanta University", city:ATL, state:"GA", type:"Private R2 HBCU", system:"semester", url:"https://www.cau.edu/academics/academic-calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Agnes Scott College", city:ATL, state:"GA", type:"Private LAC", system:"semester", url:"https://www.agnesscott.edu/registrar/academic-calendar.html", terms: cp(TPL_SEM_STD) },
+  { name:"Oglethorpe University", city:ATL, state:"GA", type:"Private LAC", system:"semester", url:"https://www.oglethorpe.edu/academics/registrar/academic-calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Mercer University (Atlanta campus)", city:ATL, state:"GA", type:"Private R2", system:"semester", url:"https://registrar.mercer.edu/calendars/", terms: cp(TPL_SEM_STD) },
+  { name:"Georgia Gwinnett College", city:ATL, state:"GA", type:"Public", system:"semester", url:"https://www.ggc.edu/academics/academic-calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Georgia State Perimeter College", city:ATL, state:"GA", type:"Public CC", system:"semester", url:"https://perimeter.gsu.edu/", terms: cp(TPL_SEM_STD) },
+  { name:"Atlanta Metropolitan State College", city:ATL, state:"GA", type:"Public", system:"semester", url:"https://www.atlm.edu/", terms: cp(TPL_SEM_STD) },
+];
+
+// =====================================================================
+// 7. WASHINGTON – ARLINGTON – ALEXANDRIA  (DC/VA/MD/WV)
+// =====================================================================
+const DC = "Washington DC";
+const DC_INSTS = [
+  { name:"Georgetown University", city:DC, state:"DC", type:"Private R1", system:"semester", url:"https://registrar.georgetown.edu/calendars/", terms: cp(TPL_SEM_STD) },
+  { name:"George Washington University", city:DC, state:"DC", type:"Private R1", system:"semester", url:"https://www.gwu.edu/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"American University", city:DC, state:"DC", type:"Private R2", system:"semester", url:"https://www.american.edu/provost/registrar/academic-regs/academic-calendar.cfm", terms: cp(TPL_SEM_STD) },
+  { name:"Howard University", city:DC, state:"DC", type:"Private R1 HBCU", system:"semester", url:"https://www2.howard.edu/registrar/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Catholic University of America", city:DC, state:"DC", type:"Private R2", system:"semester", url:"https://enrollmentservices.catholic.edu/registrar/academic-calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Gallaudet University", city:DC, state:"DC", type:"Private", system:"semester", url:"https://gallaudet.edu/academic-calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"University of the District of Columbia (UDC)", city:DC, state:"DC", type:"Public", system:"semester", url:"https://www.udc.edu/registrar/academic-calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"George Mason University", city:DC, state:"VA", type:"Public R1", system:"semester", url:"https://registrar.gmu.edu/calendars/", terms: cp(TPL_SEM_STD) },
+  { name:"University of Maryland College Park", city:DC, state:"MD", type:"Public R1", system:"semester", url:"https://registrar.umd.edu/registration/academic-calendars", terms: cp(TPL_SEM_STD) },
+  { name:"Marymount University", city:DC, state:"VA", type:"Private R2", system:"semester", url:"https://marymount.edu/student-services/office-of-the-registrar/academic-calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Bowie State University", city:DC, state:"MD", type:"Public HBCU", system:"semester", url:"https://www.bowiestate.edu/about/administration-and-governance/registrar/academic-calendar.php", terms: cp(TPL_SEM_STD) },
+  { name:"Northern Virginia Community College (NOVA)", city:DC, state:"VA", type:"Public — system", system:"semester", url:"https://www.nvcc.edu/academic/calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Montgomery College", city:DC, state:"MD", type:"Public CC", system:"semester", url:"https://www.montgomerycollege.edu/academics/calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Prince George's Community College", city:DC, state:"MD", type:"Public CC", system:"semester", url:"https://www.pgcc.edu/academics/calendar/", terms: cp(TPL_SEM_STD) },
+];
+
+// =====================================================================
+// 8. PHILADELPHIA – CAMDEN – WILMINGTON  (PA/NJ/DE/MD)
+// =====================================================================
+const PHL = "Philadelphia";
+const PHL_INSTS = [
+  { name:"University of Pennsylvania (Penn)", city:PHL, state:"PA", type:"Private R1", system:"semester", url:"https://almanac.upenn.edu/penn-academic-calendar", terms: cp(TPL_SEM_LATE) },
+  { name:"Drexel University", city:PHL, state:"PA", type:"Private R1", system:"quarter", url:"https://drexel.edu/provost/calendars/academic/", terms: cp(TPL_QTR_NW) },
+  { name:"Temple University", city:PHL, state:"PA", type:"Public R1", system:"semester", url:"https://bulletin.temple.edu/academic-calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Saint Joseph's University", city:PHL, state:"PA", type:"Private R2", system:"semester", url:"https://www.sju.edu/offices/registrar/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"La Salle University", city:PHL, state:"PA", type:"Private", system:"semester", url:"https://www.lasalle.edu/academics/academic-calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Villanova University", city:PHL, state:"PA", type:"Private R2", system:"semester", url:"https://www1.villanova.edu/university/registrar/calendars.html", terms: cp(TPL_SEM_STD) },
+  { name:"Bryn Mawr College", city:PHL, state:"PA", type:"Private LAC", system:"semester", url:"https://www.brynmawr.edu/inside/academic-information/registrar/academic-calendar", terms: cp(TPL_SEM_LATE) },
+  { name:"Haverford College", city:PHL, state:"PA", type:"Private LAC", system:"semester", url:"https://www.haverford.edu/registrar/academic-calendar", terms: cp(TPL_SEM_LATE) },
+  { name:"Swarthmore College", city:PHL, state:"PA", type:"Private LAC", system:"semester", url:"https://www.swarthmore.edu/academics/academic-calendar", terms: { "Spring 2026":{start:"2026-01-20",end:"2026-05-15"}, "Fall 2026":{start:"2026-08-31",end:"2026-12-20"} } },
+  { name:"Thomas Jefferson University", city:PHL, state:"PA", type:"Private R2", system:"semester", url:"https://www.jefferson.edu/academics/academic-calendar.html", terms: cp(TPL_SEM_STD) },
+  { name:"Saint Joseph's (PA) — Hawk Hill", city:PHL, state:"PA", type:"Private", system:"semester", url:"https://www.sju.edu/offices/registrar/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Rutgers University–Camden", city:PHL, state:"NJ", type:"Public R2", system:"semester", url:"https://scheduling.rutgers.edu/scheduling/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Rowan University", city:PHL, state:"NJ", type:"Public R2", system:"semester", url:"https://sites.rowan.edu/registrar/academic-calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"University of Delaware", city:PHL, state:"DE", type:"Public R1", system:"semester", url:"https://www.udel.edu/academics/calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Community College of Philadelphia", city:PHL, state:"PA", type:"Public CC", system:"semester", url:"https://www.ccp.edu/college-catalog/academic-calendar", terms: cp(TPL_SEM_STD) },
+];
+
+// =====================================================================
+// 9. MIAMI – FORT LAUDERDALE – POMPANO BEACH
+// =====================================================================
+const MIA = "Miami";
+const MIA_INSTS = [
+  { name:"University of Miami", city:MIA, state:"FL", type:"Private R1", system:"semester", url:"https://registrar.miami.edu/dates-and-deadlines/academic-calendars/", terms: cp(TPL_SEM_STD) },
+  { name:"Florida International University (FIU)", city:MIA, state:"FL", type:"Public R1", system:"semester", url:"https://onestop.fiu.edu/academic-calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Florida Atlantic University (FAU)", city:MIA, state:"FL", type:"Public R1", system:"semester", url:"https://www.fau.edu/registrar/academic-calendars/", terms: cp(TPL_SEM_STD) },
+  { name:"Nova Southeastern University", city:MIA, state:"FL", type:"Private R2", system:"semester", url:"https://www.nova.edu/registrar/academic-calendar.html", terms: cp(TPL_SEM_STD) },
+  { name:"Barry University", city:MIA, state:"FL", type:"Private R2", system:"semester", url:"https://www.barry.edu/en/student-resources/academic-calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"St. Thomas University (FL)", city:MIA, state:"FL", type:"Private", system:"semester", url:"https://www.stu.edu/registrar/academic-calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Florida Memorial University", city:MIA, state:"FL", type:"Private HBCU", system:"semester", url:"https://www.fmuniv.edu/", terms: cp(TPL_SEM_STD) },
+  { name:"Miami Dade College", city:MIA, state:"FL", type:"Public — system", system:"semester", url:"https://www.mdc.edu/academics/calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Broward College", city:MIA, state:"FL", type:"Public — system", system:"semester", url:"https://www.broward.edu/academics/calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Palm Beach State College", city:MIA, state:"FL", type:"Public CC", system:"semester", url:"https://www.palmbeachstate.edu/calendars/academic-calendar.aspx", terms: cp(TPL_SEM_STD) },
+];
+
+// =====================================================================
+// 10. PHOENIX – MESA – CHANDLER
+// =====================================================================
+const PHX = "Phoenix";
+const PHX_INSTS = [
+  { name:"Arizona State University (ASU)", city:PHX, state:"AZ", type:"Public R1", system:"semester", url:"https://registrar.asu.edu/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Grand Canyon University", city:PHX, state:"AZ", type:"Private", system:"semester", url:"https://www.gcu.edu/academics/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"University of Arizona (Tucson)", city:PHX, state:"AZ", type:"Public R1", system:"semester", url:"https://registrar.arizona.edu/dates-deadlines/calendars-deadlines", terms: cp(TPL_SEM_STD) },
+  { name:"Northern Arizona University", city:PHX, state:"AZ", type:"Public R2", system:"semester", url:"https://nau.edu/registrar/calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Embry-Riddle Aeronautical University (Prescott)", city:PHX, state:"AZ", type:"Private", system:"semester", url:"https://erau.edu/about/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Maricopa Community Colleges (10-college system)", city:PHX, state:"AZ", type:"Public — system", system:"semester", url:"https://district.maricopa.edu/administrative-regulations/2-students/academic-calendars", terms: cp(TPL_SEM_STD) },
+  { name:"Mesa Community College", city:PHX, state:"AZ", type:"Public CC", system:"semester", url:"https://www.mesacc.edu/students/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Phoenix College", city:PHX, state:"AZ", type:"Public CC", system:"semester", url:"https://www.phoenixcollege.edu/students/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Glendale Community College (AZ)", city:PHX, state:"AZ", type:"Public CC", system:"semester", url:"https://www.gccaz.edu/", terms: cp(TPL_SEM_STD) },
+];
+
+// =====================================================================
+// 11. BOSTON – CAMBRIDGE – NEWTON  (MA/NH)
+// =====================================================================
+const BOS = "Boston";
+const BOS_INSTS = [
+  { name:"Harvard University", city:BOS, state:"MA", type:"Private R1", system:"semester", url:"https://calendar.college.harvard.edu/academic_calendar", terms: { "Spring 2026":{start:"2026-01-26",end:"2026-05-16"}, "Summer 2026":{start:"2026-06-22",end:"2026-08-14"}, "Fall 2026":{start:"2026-09-01",end:"2026-12-19"} } },
+  { name:"Massachusetts Institute of Technology (MIT)", city:BOS, state:"MA", type:"Private R1", system:"semester", url:"https://registrar.mit.edu/calendar", terms: { "Spring 2026":{start:"2026-02-02",end:"2026-05-22"}, "Summer 2026":{start:"2026-06-08",end:"2026-08-21"}, "Fall 2026":{start:"2026-09-08",end:"2026-12-18"} } },
+  { name:"Boston University", city:BOS, state:"MA", type:"Private R1", system:"semester", url:"https://www.bu.edu/reg/calendars/semester/", terms: cp(TPL_SEM_STD) },
+  { name:"Boston College", city:BOS, state:"MA", type:"Private R1", system:"semester", url:"https://www.bc.edu/bc-web/offices/student-services/registrar/academic-calendar/academic-calendar-2026-2027.html", terms: cp(TPL_SEM_STD) },
+  { name:"Northeastern University", city:BOS, state:"MA", type:"Private R1", system:"semester", url:"https://registrar.northeastern.edu/article/academic-calendar/", terms: { "Spring 2026": {start:"2026-01-07",end:"2026-04-26"}, "Summer 2026": {start:"2026-05-06",end:"2026-08-16"}, "Fall 2026": {start:"2026-09-09",end:"2026-12-20"} } },
+  { name:"Tufts University", city:BOS, state:"MA", type:"Private R1", system:"semester", url:"https://students.tufts.edu/registrar/courses-and-calendars/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Brandeis University", city:BOS, state:"MA", type:"Private R1", system:"semester", url:"https://www.brandeis.edu/registrar/calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Suffolk University", city:BOS, state:"MA", type:"Private R2", system:"semester", url:"https://www.suffolk.edu/about/directory/registrars-office/academic-calendars", terms: cp(TPL_SEM_STD) },
+  { name:"Emerson College", city:BOS, state:"MA", type:"Private", system:"semester", url:"https://emerson.edu/academics/registrar/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Berklee College of Music", city:BOS, state:"MA", type:"Private specialty", system:"semester", url:"https://college.berklee.edu/registrar/calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Massachusetts College of Art and Design (MassArt)", city:BOS, state:"MA", type:"Public specialty", system:"semester", url:"https://massart.edu/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"University of Massachusetts Boston", city:BOS, state:"MA", type:"Public R1", system:"semester", url:"https://www.umb.edu/registrar/academic_calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"University of Massachusetts Lowell", city:BOS, state:"MA", type:"Public R2", system:"semester", url:"https://www.uml.edu/registrar/calendars/", terms: cp(TPL_SEM_STD) },
+  { name:"Wellesley College", city:BOS, state:"MA", type:"Private LAC", system:"semester", url:"https://www.wellesley.edu/registrar/calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Babson College", city:BOS, state:"MA", type:"Private", system:"semester", url:"https://www.babson.edu/academics/academic-calendars/", terms: cp(TPL_SEM_STD) },
+  { name:"Olin College of Engineering", city:BOS, state:"MA", type:"Private specialty", system:"semester", url:"https://www.olin.edu/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Bentley University", city:BOS, state:"MA", type:"Private", system:"semester", url:"https://www.bentley.edu/about/registrars-office/academic-calendars", terms: cp(TPL_SEM_STD) },
+  { name:"Simmons University", city:BOS, state:"MA", type:"Private", system:"semester", url:"https://www.simmons.edu/about/student-services/registrar/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Bunker Hill Community College", city:BOS, state:"MA", type:"Public CC", system:"semester", url:"https://www.bhcc.edu/academiccalendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Roxbury Community College", city:BOS, state:"MA", type:"Public CC", system:"semester", url:"https://www.rcc.mass.edu/academic-calendar", terms: cp(TPL_SEM_STD) },
+];
+
+// =====================================================================
+// 12. RIVERSIDE – SAN BERNARDINO – ONTARIO (Inland Empire)
+// =====================================================================
+const IE = "Inland Empire";
+const IE_INSTS = [
+  { name:"University of Redlands", city:IE, state:"CA", type:"Private", system:"semester", url:"https://www.redlands.edu/registrar/", terms: cp(TPL_SEM_CSU) },
+  { name:"Cal State San Bernardino", city:IE, state:"CA", type:"Public", system:"quarter", url:"https://www.csusb.edu/academic-calendar", terms: cp(TPL_QTR_UC) },
+  { name:"Cal Baptist University", city:IE, state:"CA", type:"Private R2", system:"semester", url:"https://calbaptist.edu/registrar/", terms: cp(TPL_SEM_CSU) },
+  { name:"La Sierra University", city:IE, state:"CA", type:"Private", system:"quarter", url:"https://lasierra.edu/registrar/", terms: cp(TPL_QTR_PRIV) },
+  { name:"Loma Linda University", city:IE, state:"CA", type:"Private R2", system:"quarter", url:"https://home.llu.edu/academic-calendar", terms: cp(TPL_QTR_PRIV) },
+  { name:"Riverside Community College District", city:IE, state:"CA", type:"Public — system", system:"semester", url:"https://www.rccd.edu/", terms: cp(TPL_SEM_CACC) },
+  { name:"San Bernardino Community College District", city:IE, state:"CA", type:"Public — system", system:"semester", url:"https://www.sbccd.edu/", terms: cp(TPL_SEM_CACC) },
+  { name:"Chaffey College", city:IE, state:"CA", type:"Public CC", system:"semester", url:"https://www.chaffey.edu/admissions/calendar.php", terms: cp(TPL_SEM_CACC) },
+  { name:"Mt. San Antonio College", city:IE, state:"CA", type:"Public CC", system:"semester", url:"https://www.mtsac.edu/", terms: cp(TPL_SEM_CACC) },
+];
+
+// =====================================================================
+// 13. SAN FRANCISCO – OAKLAND – BERKELEY (Bay Area)
+// =====================================================================
+const SF = "San Francisco Bay Area";
+const SF_INSTS = [
+  { name:"Stanford University", city:SF, state:"CA", type:"Private R1", system:"quarter", url:"https://studentservices.stanford.edu/calendar-events/academic-calendars/stanford-academic-calendar-2025-2026", terms: cp(TPL_QTR_PRIV) },
+  { name:"University of California, Berkeley (UC Berkeley)", city:SF, state:"CA", type:"Public R1", system:"semester", url:"https://registrar.berkeley.edu/scheduling/academic-scheduling/academic-calendar/", terms: { "Spring 2026":{start:"2026-01-13",end:"2026-05-15"}, "Summer 2026":{start:"2026-05-26",end:"2026-08-14"}, "Fall 2026":{start:"2026-08-19",end:"2026-12-18"} } },
+  { name:"University of California, San Francisco (UCSF)", city:SF, state:"CA", type:"Public R1 health", system:"quarter", url:"https://registrar.ucsf.edu/academic-calendar", terms: cp(TPL_QTR_UC) },
+  { name:"University of California, Santa Cruz (UCSC)", city:SF, state:"CA", type:"Public R1", system:"quarter", url:"https://registrar.ucsc.edu/calendar/academic/", terms: cp(TPL_QTR_UC) },
+  { name:"San Jose State University", city:SF, state:"CA", type:"Public R2", system:"semester", url:"https://www.sjsu.edu/registrar/calendar/index.php", terms: cp(TPL_SEM_CSU) },
+  { name:"San Francisco State University", city:SF, state:"CA", type:"Public R2", system:"semester", url:"https://registrar.sfsu.edu/academic-calendars", terms: cp(TPL_SEM_CSU) },
+  { name:"Cal State East Bay", city:SF, state:"CA", type:"Public", system:"semester", url:"https://www.csueastbay.edu/registrar/academic-calendar/", terms: cp(TPL_SEM_CSU) },
+  { name:"Sonoma State University", city:SF, state:"CA", type:"Public", system:"semester", url:"https://registrar.sonoma.edu/academic-calendar", terms: cp(TPL_SEM_CSU) },
+  { name:"Santa Clara University", city:SF, state:"CA", type:"Private R2", system:"quarter", url:"https://www.scu.edu/registrar/academic-calendars/", terms: cp(TPL_QTR_PRIV) },
+  { name:"University of San Francisco (USF)", city:SF, state:"CA", type:"Private R2", system:"semester", url:"https://www.usfca.edu/academic-calendar", terms: cp(TPL_SEM_CSU) },
+  { name:"Saint Mary's College of California", city:SF, state:"CA", type:"Private", system:"semester", url:"https://www.stmarys-ca.edu/academic-calendar", terms: cp(TPL_SEM_CSU) },
+  { name:"Mills College at Northeastern", city:SF, state:"CA", type:"Private", system:"semester", url:"https://www.mills.edu/registrar/academic-calendar.php", terms: cp(TPL_SEM_CSU) },
+  { name:"California College of the Arts (CCA)", city:SF, state:"CA", type:"Private specialty", system:"semester", url:"https://www.cca.edu/academics/calendar/", terms: cp(TPL_SEM_CSU) },
+  { name:"San Francisco Conservatory of Music", city:SF, state:"CA", type:"Private specialty", system:"semester", url:"https://sfcm.edu/academics/calendar", terms: cp(TPL_SEM_LATE) },
+  { name:"City College of San Francisco", city:SF, state:"CA", type:"Public CC", system:"semester", url:"https://www.ccsf.edu/academics/academic-calendar", terms: cp(TPL_SEM_CACC) },
+  { name:"Peralta Community College District", city:SF, state:"CA", type:"Public — system", system:"semester", url:"https://web.peralta.edu/academic-affairs/academic-calendar/", terms: cp(TPL_SEM_CACC) },
+  { name:"Foothill–De Anza Community College District", city:SF, state:"CA", type:"Public — system", system:"quarter", url:"https://www.fhda.edu/", terms: cp(TPL_QTR_UC) },
+  { name:"West Valley–Mission Community College District", city:SF, state:"CA", type:"Public — system", system:"semester", url:"https://www.wvm.edu/", terms: cp(TPL_SEM_CACC) },
+];
+
+// =====================================================================
+// 14. DETROIT – WARREN – DEARBORN
+// =====================================================================
+const DET = "Detroit";
+const DET_INSTS = [
+  { name:"University of Michigan (Ann Arbor)", city:DET, state:"MI", type:"Public R1", system:"semester", url:"https://ro.umich.edu/calendars/academic-calendar", terms: { "Spring 2026":{start:"2026-01-07",end:"2026-04-28"}, "Spring/Summer 2026":{start:"2026-05-05",end:"2026-08-19"}, "Fall 2026":{start:"2026-08-31",end:"2026-12-21"} } },
+  { name:"Wayne State University", city:DET, state:"MI", type:"Public R1", system:"semester", url:"https://wayne.edu/registrar/registration/calendar25-26", terms: cp(TPL_SEM_STD) },
+  { name:"Michigan State University (East Lansing)", city:DET, state:"MI", type:"Public R1", system:"semester", url:"https://reg.msu.edu/ROInfo/Calendar/AcademicCal.aspx", terms: { "Spring 2026":{start:"2026-01-12",end:"2026-05-01"}, "Summer 2026":{start:"2026-05-11",end:"2026-08-13"}, "Fall 2026":{start:"2026-08-31",end:"2026-12-18"} } },
+  { name:"University of Michigan–Dearborn", city:DET, state:"MI", type:"Public", system:"semester", url:"https://umdearborn.edu/registrar/registration-information/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Oakland University", city:DET, state:"MI", type:"Public R2", system:"semester", url:"https://www.oakland.edu/registrar/important-dates/", terms: cp(TPL_SEM_STD) },
+  { name:"Eastern Michigan University", city:DET, state:"MI", type:"Public R2", system:"semester", url:"https://www.emich.edu/registrar/calendars/", terms: cp(TPL_SEM_STD) },
+  { name:"University of Detroit Mercy", city:DET, state:"MI", type:"Private R2", system:"semester", url:"https://www.udmercy.edu/current-students/registrar/academic-resources/", terms: cp(TPL_SEM_STD) },
+  { name:"Lawrence Technological University", city:DET, state:"MI", type:"Private", system:"semester", url:"https://www.ltu.edu/registrar/", terms: cp(TPL_SEM_STD) },
+  { name:"College for Creative Studies (CCS)", city:DET, state:"MI", type:"Private specialty", system:"semester", url:"https://www.collegeforcreativestudies.edu/student-life/registrar/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Wayne County Community College District", city:DET, state:"MI", type:"Public — system", system:"semester", url:"https://www.wcccd.edu/", terms: cp(TPL_SEM_STD) },
+  { name:"Macomb Community College", city:DET, state:"MI", type:"Public CC", system:"semester", url:"https://www.macomb.edu/", terms: cp(TPL_SEM_STD) },
+  { name:"Henry Ford College", city:DET, state:"MI", type:"Public CC", system:"semester", url:"https://www.hfcc.edu/", terms: cp(TPL_SEM_STD) },
+];
+
+// =====================================================================
+// 15. SEATTLE – TACOMA – BELLEVUE
+// =====================================================================
+const SEA = "Seattle";
+const SEA_INSTS = [
+  { name:"University of Washington (Seattle)", city:SEA, state:"WA", type:"Public R1", system:"quarter", url:"https://www.washington.edu/students/reg/calendar.html", terms: cp(TPL_QTR_UW) },
+  { name:"University of Washington Bothell", city:SEA, state:"WA", type:"Public", system:"quarter", url:"https://www.uwb.edu/academic-calendar/", terms: cp(TPL_QTR_UW) },
+  { name:"University of Washington Tacoma", city:SEA, state:"WA", type:"Public", system:"quarter", url:"https://www.tacoma.uw.edu/registrar/academic-calendar", terms: cp(TPL_QTR_UW) },
+  { name:"Seattle University", city:SEA, state:"WA", type:"Private R2", system:"quarter", url:"https://www.seattleu.edu/registrar/academic-calendar/", terms: cp(TPL_QTR_PRIV) },
+  { name:"Seattle Pacific University", city:SEA, state:"WA", type:"Private", system:"quarter", url:"https://spu.edu/administration/registrar/calendar", terms: cp(TPL_QTR_PRIV) },
+  { name:"Western Washington University (Bellingham)", city:SEA, state:"WA", type:"Public R2", system:"quarter", url:"https://registrar.wwu.edu/academic-calendars", terms: cp(TPL_QTR_UW) },
+  { name:"Pacific Lutheran University", city:SEA, state:"WA", type:"Private", system:"semester", url:"https://www.plu.edu/registrar/academic-calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"University of Puget Sound", city:SEA, state:"WA", type:"Private LAC", system:"semester", url:"https://www.pugetsound.edu/registrar/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Cornish College of the Arts", city:SEA, state:"WA", type:"Private specialty", system:"semester", url:"https://www.cornish.edu/academic-calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Seattle Colleges (North/Central/South)", city:SEA, state:"WA", type:"Public — system", system:"quarter", url:"https://seattlecolleges.edu/academics/academic-calendar", terms: cp(TPL_QTR_UW) },
+  { name:"Bellevue College", city:SEA, state:"WA", type:"Public CC", system:"quarter", url:"https://www.bellevuecollege.edu/calendar/academic/", terms: cp(TPL_QTR_UW) },
+  { name:"Highline College", city:SEA, state:"WA", type:"Public CC", system:"quarter", url:"https://www.highline.edu/registration-records/academic-calendar/", terms: cp(TPL_QTR_UW) },
+  { name:"Tacoma Community College", city:SEA, state:"WA", type:"Public CC", system:"quarter", url:"https://www.tacomacc.edu/", terms: cp(TPL_QTR_UW) },
+];
+
+// =====================================================================
+// 16. MINNEAPOLIS – ST. PAUL – BLOOMINGTON
+// =====================================================================
+const MSP = "Minneapolis-St. Paul";
+const MSP_INSTS = [
+  { name:"University of Minnesota Twin Cities", city:MSP, state:"MN", type:"Public R1", system:"semester", url:"https://onestop.umn.edu/calendar/academic-calendar", terms: { "Spring 2026":{start:"2026-01-20",end:"2026-05-08"}, "Summer 2026":{start:"2026-05-18",end:"2026-08-14"}, "Fall 2026":{start:"2026-09-08",end:"2026-12-23"} } },
+  { name:"Macalester College", city:MSP, state:"MN", type:"Private LAC", system:"semester", url:"https://www.macalester.edu/registrar/academic-calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"University of St. Thomas (MN)", city:MSP, state:"MN", type:"Private R2", system:"semester", url:"https://www.stthomas.edu/academics/calendars/", terms: cp(TPL_SEM_STD) },
+  { name:"Hamline University", city:MSP, state:"MN", type:"Private", system:"semester", url:"https://www.hamline.edu/academic-calendars", terms: cp(TPL_SEM_STD) },
+  { name:"Augsburg University", city:MSP, state:"MN", type:"Private", system:"semester", url:"https://www.augsburg.edu/registrar/academic-calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Metropolitan State University", city:MSP, state:"MN", type:"Public", system:"semester", url:"https://www.metrostate.edu/", terms: cp(TPL_SEM_STD) },
+  { name:"Concordia University, St. Paul", city:MSP, state:"MN", type:"Private", system:"semester", url:"https://www.csp.edu/", terms: cp(TPL_SEM_STD) },
+  { name:"Bethel University (MN)", city:MSP, state:"MN", type:"Private", system:"semester", url:"https://www.bethel.edu/registrar/academic-calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Minneapolis College of Art and Design (MCAD)", city:MSP, state:"MN", type:"Private specialty", system:"semester", url:"https://mcad.edu/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Minneapolis Community and Technical College", city:MSP, state:"MN", type:"Public CC", system:"semester", url:"https://minneapolis.edu/", terms: cp(TPL_SEM_STD) },
+  { name:"Saint Paul College", city:MSP, state:"MN", type:"Public CC", system:"semester", url:"https://www.saintpaul.edu/", terms: cp(TPL_SEM_STD) },
+  { name:"Normandale Community College", city:MSP, state:"MN", type:"Public CC", system:"semester", url:"https://www.normandale.edu/", terms: cp(TPL_SEM_STD) },
+];
+
+// =====================================================================
+// 17. TAMPA – ST. PETERSBURG – CLEARWATER
+// =====================================================================
+const TPA = "Tampa";
+const TPA_INSTS = [
+  { name:"University of South Florida (USF)", city:TPA, state:"FL", type:"Public R1", system:"semester", url:"https://www.usf.edu/registrar/calendars/", terms: cp(TPL_SEM_STD) },
+  { name:"University of Tampa", city:TPA, state:"FL", type:"Private R2", system:"semester", url:"https://www.ut.edu/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Eckerd College", city:TPA, state:"FL", type:"Private LAC", system:"semester", url:"https://www.eckerd.edu/registrar/calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Saint Leo University", city:TPA, state:"FL", type:"Private R2", system:"semester", url:"https://www.saintleo.edu/registrar/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Florida Polytechnic University", city:TPA, state:"FL", type:"Public", system:"semester", url:"https://floridapoly.edu/registrar/calendar.php", terms: cp(TPL_SEM_STD) },
+  { name:"Hillsborough Community College", city:TPA, state:"FL", type:"Public — system", system:"semester", url:"https://www.hccfl.edu/admissions/registrar/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"St. Petersburg College", city:TPA, state:"FL", type:"Public — system", system:"semester", url:"https://www.spcollege.edu/academics/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Pasco-Hernando State College", city:TPA, state:"FL", type:"Public CC", system:"semester", url:"https://www.phsc.edu/", terms: cp(TPL_SEM_STD) },
+];
+
+// =====================================================================
+// 18. SAN DIEGO – CHULA VISTA – CARLSBAD
+// =====================================================================
+const SD = "San Diego";
+const SD_INSTS = [
+  { name:"University of California, San Diego (UCSD)", city:SD, state:"CA", type:"Public R1", system:"quarter", url:"https://blink.ucsd.edu/instructors/resources/academic/calendars/", terms: cp(TPL_QTR_UC) },
+  { name:"San Diego State University (SDSU)", city:SD, state:"CA", type:"Public R2", system:"semester", url:"https://registrar.sdsu.edu/academic_calendar/", terms: cp(TPL_SEM_CSU) },
+  { name:"University of San Diego (USD)", city:SD, state:"CA", type:"Private R2", system:"semester", url:"https://www.sandiego.edu/academics/academic-calendars.php", terms: cp(TPL_SEM_CSU) },
+  { name:"Point Loma Nazarene University", city:SD, state:"CA", type:"Private", system:"semester", url:"https://www.pointloma.edu/offices/records/academic-calendar", terms: cp(TPL_SEM_CSU) },
+  { name:"Cal State San Marcos", city:SD, state:"CA", type:"Public", system:"semester", url:"https://www.csusm.edu/registrar/academic-calendar/", terms: cp(TPL_SEM_CSU) },
+  { name:"San Diego Community College District", city:SD, state:"CA", type:"Public — system", system:"semester", url:"https://www.sdccd.edu/students/calendar/index.aspx", terms: cp(TPL_SEM_CACC) },
+  { name:"Grossmont-Cuyamaca Community College District", city:SD, state:"CA", type:"Public — system", system:"semester", url:"https://www.gcccd.edu/", terms: cp(TPL_SEM_CACC) },
+  { name:"MiraCosta College", city:SD, state:"CA", type:"Public CC", system:"semester", url:"https://www.miracosta.edu/", terms: cp(TPL_SEM_CACC) },
+  { name:"Palomar College", city:SD, state:"CA", type:"Public CC", system:"semester", url:"https://www.palomar.edu/", terms: cp(TPL_SEM_CACC) },
+];
+
+// =====================================================================
+// 19. DENVER – AURORA – LAKEWOOD
+// =====================================================================
+const DEN = "Denver";
+const DEN_INSTS = [
+  { name:"University of Colorado Boulder", city:DEN, state:"CO", type:"Public R1", system:"semester", url:"https://www.colorado.edu/registrar/students/calendar", terms: cp(TPL_SEM_STD) },
+  { name:"University of Colorado Denver", city:DEN, state:"CO", type:"Public R1", system:"semester", url:"https://www.ucdenver.edu/registrar/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Colorado State University (Fort Collins)", city:DEN, state:"CO", type:"Public R1", system:"semester", url:"https://registrar.colostate.edu/calendars/", terms: cp(TPL_SEM_STD) },
+  { name:"University of Denver (DU)", city:DEN, state:"CO", type:"Private R1", system:"quarter", url:"https://www.du.edu/registrar/calendar/index.html", terms: cp(TPL_QTR_PRIV) },
+  { name:"Colorado School of Mines", city:DEN, state:"CO", type:"Public R1", system:"semester", url:"https://www.mines.edu/registrar/academic-calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Metropolitan State University of Denver", city:DEN, state:"CO", type:"Public", system:"semester", url:"https://www.msudenver.edu/registrar/academic-calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Regis University", city:DEN, state:"CO", type:"Private R2", system:"semester", url:"https://www.regis.edu/academics/academic-calendar/index.aspx", terms: cp(TPL_SEM_STD) },
+  { name:"Colorado College", city:DEN, state:"CO", type:"Private LAC (block plan)", system:"semester", url:"https://www.coloradocollege.edu/academics/curriculum/calendar.html", terms: cp(TPL_BLOCK) },
+  { name:"Community College of Denver", city:DEN, state:"CO", type:"Public CC", system:"semester", url:"https://www.ccd.edu/admissions/dates-and-deadlines/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Front Range Community College", city:DEN, state:"CO", type:"Public CC", system:"semester", url:"https://www.frontrange.edu/", terms: cp(TPL_SEM_STD) },
+  { name:"Arapahoe Community College", city:DEN, state:"CO", type:"Public CC", system:"semester", url:"https://www.arapahoe.edu/", terms: cp(TPL_SEM_STD) },
+];
+
+// =====================================================================
+// 20. BALTIMORE – COLUMBIA – TOWSON
+// =====================================================================
+const BAL = "Baltimore";
+const BAL_INSTS = [
+  { name:"Johns Hopkins University", city:BAL, state:"MD", type:"Private R1", system:"semester", url:"https://registrar.jhu.edu/academic-calendar/", terms: { "Spring 2026":{start:"2026-01-26",end:"2026-05-15"}, "Summer 2026":{start:"2026-05-26",end:"2026-08-14"}, "Fall 2026":{start:"2026-08-31",end:"2026-12-18"} } },
+  { name:"University of Maryland, Baltimore County (UMBC)", city:BAL, state:"MD", type:"Public R1", system:"semester", url:"https://registrar.umbc.edu/calendars/academic-calendars/", terms: cp(TPL_SEM_STD) },
+  { name:"Towson University", city:BAL, state:"MD", type:"Public R2", system:"semester", url:"https://www.towson.edu/registrar/calendars/", terms: cp(TPL_SEM_STD) },
+  { name:"Loyola University Maryland", city:BAL, state:"MD", type:"Private R2", system:"semester", url:"https://www.loyola.edu/department/registrar/calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Morgan State University", city:BAL, state:"MD", type:"Public R2 HBCU", system:"semester", url:"https://www.morgan.edu/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"University of Baltimore", city:BAL, state:"MD", type:"Public", system:"semester", url:"https://www.ubalt.edu/registrar/academic-calendars/", terms: cp(TPL_SEM_STD) },
+  { name:"Notre Dame of Maryland University", city:BAL, state:"MD", type:"Private", system:"semester", url:"https://www.ndm.edu/", terms: cp(TPL_SEM_STD) },
+  { name:"Maryland Institute College of Art (MICA)", city:BAL, state:"MD", type:"Private specialty", system:"semester", url:"https://www.mica.edu/registrar/", terms: cp(TPL_SEM_STD) },
+  { name:"Goucher College", city:BAL, state:"MD", type:"Private LAC", system:"semester", url:"https://www.goucher.edu/registrar/", terms: cp(TPL_SEM_STD) },
+  { name:"Stevenson University", city:BAL, state:"MD", type:"Private", system:"semester", url:"https://www.stevenson.edu/academics/registrars-office/academic-calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Community College of Baltimore County (CCBC)", city:BAL, state:"MD", type:"Public — system", system:"semester", url:"https://www.ccbcmd.edu/Resources-for-Students/Registration/Academic-Calendar.aspx", terms: cp(TPL_SEM_STD) },
+];
+
+// =====================================================================
+// 21. ST. LOUIS, MO–IL
+// =====================================================================
+const STL = "St. Louis";
+const STL_INSTS = [
+  { name:"Washington University in St. Louis", city:STL, state:"MO", type:"Private R1", system:"semester", url:"https://registrar.washu.edu/calendars-exams/academic-calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Saint Louis University (SLU)", city:STL, state:"MO", type:"Private R1", system:"semester", url:"https://www.slu.edu/registrar/academic-calendars/", terms: cp(TPL_SEM_STD) },
+  { name:"University of Missouri–St. Louis (UMSL)", city:STL, state:"MO", type:"Public R2", system:"semester", url:"https://www.umsl.edu/registration/calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Webster University", city:STL, state:"MO", type:"Private R2", system:"semester", url:"https://www.webster.edu/academics/academic-calendar/index.php", terms: cp(TPL_SEM_STD) },
+  { name:"Maryville University", city:STL, state:"MO", type:"Private", system:"semester", url:"https://www.maryville.edu/registrar/academic-calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Lindenwood University", city:STL, state:"MO", type:"Private R2", system:"semester", url:"https://www.lindenwood.edu/academics/academic-calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Southern Illinois University Edwardsville (SIUE)", city:STL, state:"IL", type:"Public R2", system:"semester", url:"https://www.siue.edu/registrar/academic-calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Harris-Stowe State University", city:STL, state:"MO", type:"Public HBCU", system:"semester", url:"https://www.hssu.edu/", terms: cp(TPL_SEM_STD) },
+  { name:"St. Louis Community College", city:STL, state:"MO", type:"Public — system", system:"semester", url:"https://stlcc.edu/about/calendars/academic-calendar.aspx", terms: cp(TPL_SEM_STD) },
+];
+
+// =====================================================================
+// 22. ORLANDO – KISSIMMEE – SANFORD
+// =====================================================================
+const ORL = "Orlando";
+const ORL_INSTS = [
+  { name:"University of Central Florida (UCF)", city:ORL, state:"FL", type:"Public R1", system:"semester", url:"https://calendar.ucf.edu/2026/spring", terms: cp(TPL_SEM_STD) },
+  { name:"Rollins College", city:ORL, state:"FL", type:"Private LAC", system:"semester", url:"https://www.rollins.edu/registrar/academic-calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Full Sail University", city:ORL, state:"FL", type:"Private specialty", system:"trimester", url:"https://www.fullsail.edu/", terms: cp(TPL_SEM_STD) },
+  { name:"AdventHealth University", city:ORL, state:"FL", type:"Private", system:"semester", url:"https://www.ahu.edu/registrar", terms: cp(TPL_SEM_STD) },
+  { name:"Stetson University", city:ORL, state:"FL", type:"Private R2", system:"semester", url:"https://www.stetson.edu/other/registrar/calendars.php", terms: cp(TPL_SEM_STD) },
+  { name:"Valencia College", city:ORL, state:"FL", type:"Public — system", system:"semester", url:"https://valenciacollege.edu/academics/calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Seminole State College of Florida", city:ORL, state:"FL", type:"Public CC", system:"semester", url:"https://www.seminolestate.edu/calendar/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Lake-Sumter State College", city:ORL, state:"FL", type:"Public CC", system:"semester", url:"https://www.lssc.edu/", terms: cp(TPL_SEM_STD) },
+];
+
+// =====================================================================
+// 23. CHARLOTTE – CONCORD – GASTONIA
+// =====================================================================
+const CLT = "Charlotte";
+const CLT_INSTS = [
+  { name:"University of North Carolina at Charlotte (UNCC)", city:CLT, state:"NC", type:"Public R1", system:"semester", url:"https://registrar.charlotte.edu/calendars-schedules/academic-year-fall-2025-spring-2026/", terms: { "Spring 2026":{start:"2026-01-13",end:"2026-05-08"}, "Summer 2026":{start:"2026-05-18",end:"2026-08-07"}, "Fall 2026":{start:"2026-08-24",end:"2026-12-18"} } },
+  { name:"Davidson College", city:CLT, state:"NC", type:"Private LAC", system:"semester", url:"https://www.davidson.edu/registrar/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Queens University of Charlotte", city:CLT, state:"NC", type:"Private", system:"semester", url:"https://www.queens.edu/academics/academic-calendar.html", terms: cp(TPL_SEM_STD) },
+  { name:"Johnson C. Smith University", city:CLT, state:"NC", type:"Private HBCU", system:"semester", url:"https://www.jcsu.edu/", terms: cp(TPL_SEM_STD) },
+  { name:"Wingate University", city:CLT, state:"NC", type:"Private", system:"semester", url:"https://www.wingate.edu/", terms: cp(TPL_SEM_STD) },
+  { name:"Pfeiffer University", city:CLT, state:"NC", type:"Private", system:"semester", url:"https://www.pfeiffer.edu/", terms: cp(TPL_SEM_STD) },
+  { name:"Belmont Abbey College", city:CLT, state:"NC", type:"Private LAC", system:"semester", url:"https://belmontabbeycollege.edu/registrar/", terms: cp(TPL_SEM_STD) },
+  { name:"Central Piedmont Community College", city:CLT, state:"NC", type:"Public — system", system:"semester", url:"https://www.cpcc.edu/", terms: cp(TPL_SEM_STD) },
+  { name:"Rowan-Cabarrus Community College", city:CLT, state:"NC", type:"Public CC", system:"semester", url:"https://www.rccc.edu/", terms: cp(TPL_SEM_STD) },
+];
+
+// =====================================================================
+// 24. SAN ANTONIO – NEW BRAUNFELS
+// =====================================================================
+const SAT = "San Antonio";
+const SAT_INSTS = [
+  { name:"University of Texas at San Antonio (UTSA)", city:SAT, state:"TX", type:"Public R1", system:"semester", url:"https://www.utsa.edu/calendar/academic/", terms: cp(TPL_SEM_TX) },
+  { name:"Trinity University", city:SAT, state:"TX", type:"Private LAC", system:"semester", url:"https://trinity.edu/academics/academic-calendar", terms: cp(TPL_SEM_TX) },
+  { name:"University of the Incarnate Word", city:SAT, state:"TX", type:"Private R2", system:"semester", url:"https://my.uiw.edu/registrar/calendar.html", terms: cp(TPL_SEM_TX) },
+  { name:"St. Mary's University (TX)", city:SAT, state:"TX", type:"Private R2", system:"semester", url:"https://www.stmarytx.edu/academics/registrar/academic-calendar/", terms: cp(TPL_SEM_TX) },
+  { name:"Our Lady of the Lake University", city:SAT, state:"TX", type:"Private", system:"semester", url:"https://www.ollusa.edu/academics/registrar/academic-calendar.html", terms: cp(TPL_SEM_TX) },
+  { name:"Texas A&M University–San Antonio", city:SAT, state:"TX", type:"Public", system:"semester", url:"https://www.tamusa.edu/registrar/academic-calendar.html", terms: cp(TPL_SEM_TX) },
+  { name:"University of Texas Health San Antonio", city:SAT, state:"TX", type:"Public R1 health", system:"semester", url:"https://www.uthscsa.edu/academics/registrar/academic-calendar", terms: cp(TPL_SEM_TX) },
+  { name:"Alamo Colleges District", city:SAT, state:"TX", type:"Public — system", system:"semester", url:"https://www.alamo.edu/", terms: cp(TPL_SEM_TX) },
+];
+
+// =====================================================================
+// 25. PORTLAND – VANCOUVER – HILLSBORO  (OR/WA)
+// =====================================================================
+const PDX = "Portland";
+const PDX_INSTS = [
+  { name:"Portland State University", city:PDX, state:"OR", type:"Public R2", system:"quarter", url:"https://www.pdx.edu/registration/", terms: cp(TPL_QTR_UW) },
+  { name:"Oregon Health & Science University (OHSU)", city:PDX, state:"OR", type:"Public R1 health", system:"quarter", url:"https://www.ohsu.edu/registrar/academic-calendar", terms: cp(TPL_QTR_UW) },
+  { name:"Lewis & Clark College", city:PDX, state:"OR", type:"Private LAC", system:"semester", url:"https://college.lclark.edu/academics/calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"Reed College", city:PDX, state:"OR", type:"Private LAC", system:"semester", url:"https://www.reed.edu/academic-calendar/", terms: cp(TPL_SEM_LATE) },
+  { name:"University of Portland", city:PDX, state:"OR", type:"Private R2", system:"semester", url:"https://www.up.edu/registrar/academiccalendar.html", terms: cp(TPL_SEM_STD) },
+  { name:"Pacific University", city:PDX, state:"OR", type:"Private R2", system:"semester", url:"https://www.pacificu.edu/academics/registrar/academic-calendar", terms: cp(TPL_SEM_STD) },
+  { name:"Concordia University (Portland)", city:PDX, state:"OR", type:"Private", system:"semester", url:"https://www.cu-portland.edu/", terms: cp(TPL_SEM_STD) },
+  { name:"Oregon State University (Corvallis)", city:PDX, state:"OR", type:"Public R1", system:"quarter", url:"https://registrar.oregonstate.edu/osu-academic-calendar", terms: cp(TPL_QTR_UW) },
+  { name:"University of Oregon (Eugene)", city:PDX, state:"OR", type:"Public R1", system:"quarter", url:"https://registrar.uoregon.edu/calendars/academic", terms: cp(TPL_QTR_UW) },
+  { name:"Portland Community College", city:PDX, state:"OR", type:"Public — system", system:"quarter", url:"https://www.pcc.edu/enroll/calendar/", terms: cp(TPL_QTR_UW) },
+  { name:"Mt. Hood Community College", city:PDX, state:"OR", type:"Public CC", system:"quarter", url:"https://www.mhcc.edu/", terms: cp(TPL_QTR_UW) },
+  { name:"Clackamas Community College", city:PDX, state:"OR", type:"Public CC", system:"quarter", url:"https://www.clackamas.edu/", terms: cp(TPL_QTR_UW) },
+  { name:"Pacific Northwest College of Art (PNCA)", city:PDX, state:"OR", type:"Private specialty", system:"semester", url:"https://www.willamette.edu/pnca/", terms: cp(TPL_SEM_STD) },
+];
+
+// =====================================================================
+// TOP UNIVERSITIES OUTSIDE THE 25 METROS
+// Ivies and top-25 ranked schools not captured by the metro lists above.
+// =====================================================================
+const ELITE_OTHER_INSTS = [
+  // Standalone metros (too far from any existing metro for a same-trip visit)
+  { name:"Cornell University", city:"Ithaca", state:"NY", type:"Private R1", system:"semester", url:"https://registrar.cornell.edu/academic-calendar", terms: { "Spring 2026": {start:"2026-01-21",end:"2026-05-22"}, "Summer 2026": {start:"2026-05-26",end:"2026-08-14"}, "Fall 2026": {start:"2026-08-26",end:"2026-12-17"} } },
+  { name:"Dartmouth College", city:"Hanover", state:"NH", type:"Private R1", system:"quarter", url:"https://registrar.dartmouth.edu/calendars/academic-calendar", terms: { "Winter 2026": {start:"2026-01-05",end:"2026-03-13"}, "Spring 2026": {start:"2026-03-30",end:"2026-06-05"}, "Summer 2026": {start:"2026-06-22",end:"2026-09-04"}, "Fall 2026": {start:"2026-09-14",end:"2026-11-22"} } },
+  { name:"Vanderbilt University", city:"Nashville", state:"TN", type:"Private R1", system:"semester", url:"https://registrar.vanderbilt.edu/calendars/academic-calendar.php", terms: { "Spring 2026": {start:"2026-01-12",end:"2026-05-08"}, "Summer 2026": {start:"2026-05-26",end:"2026-08-07"}, "Fall 2026": {start:"2026-08-25",end:"2026-12-17"} } },
+  { name:"Carnegie Mellon University", city:"Pittsburgh", state:"PA", type:"Private R1", system:"semester", url:"https://www.cmu.edu/hub/registrar/academic-calendar/", terms: { "Spring 2026": {start:"2026-01-13",end:"2026-05-10"}, "Summer 2026": {start:"2026-05-18",end:"2026-08-07"}, "Fall 2026": {start:"2026-08-25",end:"2026-12-15"} } },
+  { name:"Brigham Young University (BYU)", city:"Salt Lake City", state:"UT", type:"Private R1", system:"semester", url:"https://registrar.byu.edu/academic-calendar", terms: { "Winter 2026": {start:"2026-01-05",end:"2026-04-23"}, "Spring 2026": {start:"2026-04-27",end:"2026-06-11"}, "Summer 2026": {start:"2026-06-15",end:"2026-07-30"}, "Fall 2026": {start:"2026-09-02",end:"2026-12-17"} } },
+  { name:"Virginia Tech", city:"Blacksburg", state:"VA", type:"Public R1", system:"semester", url:"https://www.registrar.vt.edu/dates-deadlines-public/academic-calendar.html", terms: { "Spring 2026": {start:"2026-01-20",end:"2026-05-08"}, "Summer 2026": {start:"2026-05-18",end:"2026-08-07"}, "Fall 2026": {start:"2026-08-24",end:"2026-12-18"} } },
+  { name:"Ohio State University", city:"Columbus", state:"OH", type:"Public R1", system:"semester", url:"https://registrar.osu.edu/academic-calendar/", terms: { "Spring 2026": {start:"2026-01-12",end:"2026-04-30"}, "Summer 2026": {start:"2026-05-11",end:"2026-08-07"}, "Fall 2026": {start:"2026-08-25",end:"2026-12-13"} } },
+  // Grouped into nearby metros (realistic same-trip distance)
+  { name:"Duke University", city:"Charlotte", state:"NC", type:"Private R1", system:"semester", url:"https://registrar.duke.edu/academic-calendars", terms: { "Spring 2026": {start:"2026-01-07",end:"2026-05-03"}, "Summer 2026": {start:"2026-05-18",end:"2026-08-07"}, "Fall 2026": {start:"2026-08-25",end:"2026-12-19"} } },
+  { name:"University of North Carolina at Chapel Hill", city:"Charlotte", state:"NC", type:"Public R1", system:"semester", url:"https://registrar.unc.edu/academic-calendar/", terms: { "Spring 2026": {start:"2026-01-07",end:"2026-05-03"}, "Summer 2026": {start:"2026-05-18",end:"2026-08-07"}, "Fall 2026": {start:"2026-08-19",end:"2026-12-14"} } },
+  { name:"Brown University", city:"Boston", state:"RI", type:"Private R1", system:"semester", url:"https://www.brown.edu/about/administration/registrar/academic-calendar", terms: { "Spring 2026": {start:"2026-01-22",end:"2026-05-22"}, "Summer 2026": {start:"2026-06-01",end:"2026-08-14"}, "Fall 2026": {start:"2026-09-03",end:"2026-12-20"} } },
+  { name:"University of Notre Dame", city:"Chicago", state:"IN", type:"Private R1", system:"semester", url:"https://registrar.nd.edu/calendars/academic-calendar/", terms: { "Spring 2026": {start:"2026-01-12",end:"2026-05-09"}, "Summer 2026": {start:"2026-05-18",end:"2026-08-07"}, "Fall 2026": {start:"2026-08-24",end:"2026-12-17"} } },
+  { name:"University of Wisconsin-Madison", city:"Chicago", state:"WI", type:"Public R1", system:"semester", url:"https://registrar.wisc.edu/dates-deadlines/", terms: { "Spring 2026": {start:"2026-01-21",end:"2026-05-15"}, "Summer 2026": {start:"2026-06-01",end:"2026-08-14"}, "Fall 2026": {start:"2026-09-02",end:"2026-12-22"} } },
+  { name:"Indiana University Bloomington", city:"Chicago", state:"IN", type:"Public R1", system:"semester", url:"https://registrar.indiana.edu/calendars/", terms: cp(TPL_SEM_STD) },
+  { name:"Purdue University", city:"Chicago", state:"IN", type:"Public R1", system:"semester", url:"https://www.purdue.edu/registrar/calendars/", terms: cp(TPL_SEM_STD) },
+  { name:"University of Illinois Urbana-Champaign", city:"Chicago", state:"IL", type:"Public R1", system:"semester", url:"https://registrar.illinois.edu/academic-calendars/", terms: { "Spring 2026": {start:"2026-01-20",end:"2026-05-13"}, "Summer 2026": {start:"2026-06-01",end:"2026-08-07"}, "Fall 2026": {start:"2026-08-24",end:"2026-12-19"} } },
+  { name:"University of Texas at Austin", city:"Dallas-Fort Worth", state:"TX", type:"Public R1", system:"semester", url:"https://registrar.utexas.edu/calendars/academic", terms: { "Spring 2026": {start:"2026-01-13",end:"2026-05-16"}, "Summer 2026": {start:"2026-06-01",end:"2026-08-14"}, "Fall 2026": {start:"2026-08-24",end:"2026-12-14"} } },
+  { name:"Pennsylvania State University", city:"Philadelphia", state:"PA", type:"Public R1", system:"semester", url:"https://registrar.psu.edu/academic-calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"University of Virginia", city:"Washington DC", state:"VA", type:"Public R1", system:"semester", url:"https://registrar.virginia.edu/academic-calendar", terms: { "Spring 2026": {start:"2026-01-13",end:"2026-05-09"}, "Summer 2026": {start:"2026-05-18",end:"2026-08-07"}, "Fall 2026": {start:"2026-08-26",end:"2026-12-19"} } },
+  { name:"University of Florida", city:"Tampa", state:"FL", type:"Public R1", system:"semester", url:"https://registrar.ufl.edu/calendars/", terms: cp(TPL_SEM_STD) },
+];
+
+const INSTITUTIONS = [
+  ...NYC_INSTS, ...LA_INSTS, ...CHI_INSTS, ...DFW_INSTS, ...HOU_INSTS,
+  ...ATL_INSTS, ...DC_INSTS, ...PHL_INSTS, ...MIA_INSTS, ...PHX_INSTS,
+  ...BOS_INSTS, ...IE_INSTS, ...SF_INSTS, ...DET_INSTS, ...SEA_INSTS,
+  ...MSP_INSTS, ...TPA_INSTS, ...SD_INSTS, ...DEN_INSTS, ...BAL_INSTS,
+  ...STL_INSTS, ...ORL_INSTS, ...CLT_INSTS, ...SAT_INSTS, ...PDX_INSTS,
+  ...ELITE_OTHER_INSTS
+];
+
+// ======================================================
+// RENDERING
+// ======================================================
+const TODAY = new Date(); TODAY.setHours(0,0,0,0);
+const TODAY_STR = TODAY.toISOString().slice(0,10);
+
+const STORAGE_KEY = "uni-calendar-edits-v1";
+function loadEdits() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); }
+  catch { return {}; }
+}
+function saveEdits(e) { localStorage.setItem(STORAGE_KEY, JSON.stringify(e)); }
+let EDITS = loadEdits();
+
+function applyEdits(inst) {
+  const key = inst.name + "|" + inst.city;
+  const e = EDITS[key];
+  if (!e) return inst;
+  const merged = JSON.parse(JSON.stringify(inst));
+  for (const t in e) {
+    if (t === "__coverage") { merged._coverage = e[t]; continue; }
+    if (!merged.terms[t]) merged.terms[t] = {};
+    Object.assign(merged.terms[t], e[t]);
+  }
+  merged._edited = true;
+  return merged;
+}
+
+const TI_TEAM = [
+  { name: "Nadia Susanto", initials: "NS", color: "#3d9e5f" },
+  { name: "Ali Algain",    initials: "AA", color: "#e05a3a" },
+  { name: "Ali Susskind",  initials: "AS", color: "#c0392b" },
+  { name: "William Yoo",   initials: "WY", color: "#7950f2" },
+  { name: "Ryan Kiernan",  initials: "RK", color: "#3b5bdb" },
+  { name: "Joe Ros",       initials: "JR", color: "#f08c00" },
+  { name: "Rick Li",       initials: "RL", color: "#1a1a1a" },
+];
+
+function buildBubbles(key, coverageStr) {
+  const active = coverageStr ? coverageStr.split(",") : [];
+  const keyAttr = key.replace(/"/g, "&quot;");
+  return TI_TEAM.map(ti => {
+    const on = active.includes(ti.initials);
+    const bg = on ? ti.color : "#e0ddd6";
+    const fg = on ? "#fff" : "#999";
+    return `<div class="ti-bubble" style="background:${bg};color:${fg}" title="${ti.name}" data-key="${keyAttr}" data-initials="${ti.initials}" onclick="toggleCoverage(this.dataset.key,this.dataset.initials)">${ti.initials}</div>`;
+  }).join("");
+}
+
+function toggleCoverage(key, initials) {
+  if (!EDITS[key]) EDITS[key] = {};
+  const current = EDITS[key].__coverage ? EDITS[key].__coverage.split(",") : [];
+  const idx = current.indexOf(initials);
+  if (idx >= 0) current.splice(idx, 1); else current.push(initials);
+  if (current.length) EDITS[key].__coverage = current.join(",");
+  else delete EDITS[key].__coverage;
+  if (!Object.keys(EDITS[key]).length) delete EDITS[key];
+  saveEdits(EDITS);
+  document.querySelectorAll(`.ti-bubbles`).forEach(el => {
+    if (el.dataset.key === key) el.innerHTML = buildBubbles(key, EDITS[key] ? EDITS[key].__coverage : "");
+  });
+}
+
+function parseDate(s) {
+  if (!s) return null;
+  const [y,m,d] = s.split("-").map(Number);
+  return new Date(y, m-1, d);
+}
+function fmtDate(s) {
+  if (!s) return "—";
+  const d = parseDate(s);
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+function daysBetween(a, b) {
+  return Math.round((b.getTime() - a.getTime()) / 86400000);
+}
+
+// Determine current status by looking at all terms
+function statusOf(inst) {
+  const today = TODAY;
+  let active = null;
+  for (const [name, t] of Object.entries(inst.terms)) {
+    if (!t.start || !t.end) continue;
+    const s = parseDate(t.start), e = parseDate(t.end);
+    if (s <= today && today <= e) { active = { name, start: s, end: e, key: name }; break; }
+  }
+  if (active) {
+    // Detect finals window: last 14 days OR if "finals" in name
+    const totalDays = daysBetween(active.start, active.end);
+    const remaining = daysBetween(today, active.end);
+    const inFinals = remaining <= Math.min(14, Math.round(totalDays * 0.15));
+    let state;
+    if (active.name.toLowerCase().includes("summer")) state = "summer";
+    else if (inFinals) state = "finals";
+    else state = "in-session";
+    return {
+      state,
+      termName: active.name,
+      daysRemaining: remaining,
+      end: active.end,
+      start: active.start
+    };
+  }
+  // Find next upcoming term
+  let nextTerm = null, nextStart = null;
+  for (const [name, t] of Object.entries(inst.terms)) {
+    if (!t.start) continue;
+    const s = parseDate(t.start);
+    if (s > today && (!nextStart || s < nextStart)) { nextStart = s; nextTerm = name; }
+  }
+  return {
+    state: "break",
+    termName: nextTerm ? `Next: ${nextTerm}` : "No upcoming term",
+    nextStart,
+    daysUntilNext: nextStart ? daysBetween(today, nextStart) : null
+  };
+}
+
+// ======================================================
+// FILTERS
+// ======================================================
+const state = {
+  view: "map",
+  search: "",
+  metro: "",
+  system: "",
+  status: "",
+  ti: "",
+  sortKey: "status",
+  sortDir: 1
+};
+
+function getMetros() {
+  return [...new Set(INSTITUTIONS.map(i => i.city))].sort();
+}
+
+function getFiltered() {
+  let arr = INSTITUTIONS.map(applyEdits);
+  if (state.search) {
+    const q = state.search.toLowerCase();
+    arr = arr.filter(i => i.name.toLowerCase().includes(q) || i.city.toLowerCase().includes(q));
+  }
+  if (state.metro) arr = arr.filter(i => i.city === state.metro);
+  if (state.system) arr = arr.filter(i => i.system === state.system);
+  if (state.ti) arr = arr.filter(i => {
+    const cov = i._coverage || "";
+    return cov.split(",").includes(state.ti);
+  });
+  arr = arr.map(i => ({ ...i, _status: statusOf(i) }));
+  if (state.status) arr = arr.filter(i => i._status.state === state.status);
+  return arr;
+}
+
+function sortItems(arr) {
+  const k = state.sortKey, dir = state.sortDir;
+  arr.sort((a,b) => {
+    let va, vb;
+    if (k === "name") { va = a.name; vb = b.name; }
+    else if (k === "city") { va = a.city; vb = b.city; }
+    else if (k === "system") { va = a.system; vb = b.system; }
+    else if (k === "type") { va = a.type; vb = b.type; }
+    else if (k === "status") {
+      const order = { "in-session": 0, "finals": 1, "summer": 2, "break": 3 };
+      va = order[a._status.state]; vb = order[b._status.state];
+      if (va === vb) {
+        const ar = a._status.daysRemaining ?? a._status.daysUntilNext ?? 9999;
+        const br = b._status.daysRemaining ?? b._status.daysUntilNext ?? 9999;
+        return (ar - br) * dir;
+      }
+    }
+    else if (k === "remaining") {
+      va = a._status.daysRemaining ?? (10000 + (a._status.daysUntilNext ?? 0));
+      vb = b._status.daysRemaining ?? (10000 + (b._status.daysUntilNext ?? 0));
+    }
+    if (va < vb) return -1 * dir;
+    if (va > vb) return 1 * dir;
+    return 0;
+  });
+  return arr;
+}
+
+// ======================================================
+// VIEWS
+// ======================================================
+function renderHeader() {
+  const items = INSTITUTIONS.map(applyEdits).map(i => ({ ...i, _status: statusOf(i) }));
+  const inSess = items.filter(i => i._status.state === "in-session").length;
+  const finals = items.filter(i => i._status.state === "finals").length;
+  const summer = items.filter(i => i._status.state === "summer").length;
+  const onBreak = items.filter(i => i._status.state === "break").length;
+  document.getElementById("subtitle").textContent =
+    `Today is ${TODAY.toLocaleDateString("en-US", { weekday:"long", month:"long", day:"numeric", year:"numeric" })} — tracking ${INSTITUTIONS.length} institutions across ${getMetros().length} metros.`;
+  document.getElementById("stats").innerHTML = `
+    <div class="stat alt"><div class="num">${inSess}</div><div class="label">In session</div></div>
+    <div class="stat pri"><div class="num">${finals}</div><div class="label">In finals</div></div>
+    <div class="stat"><div class="num">${summer}</div><div class="label">Summer term</div></div>
+    <div class="stat"><div class="num">${onBreak}</div><div class="label">Between terms</div></div>
+  `;
+}
+
+function statusPill(s) {
+  if (s.state === "in-session") return `<span class="pill in-session">In session — ${s.daysRemaining}d left</span>`;
+  if (s.state === "finals") return `<span class="pill finals">Finals — ${s.daysRemaining}d left</span>`;
+  if (s.state === "summer") return `<span class="pill summer">Summer — ${s.daysRemaining}d left</span>`;
+  if (s.daysUntilNext != null) return `<span class="pill break">Off — next term in ${s.daysUntilNext}d</span>`;
+  return `<span class="pill break">Off</span>`;
+}
+
+function termsSummary(inst) {
+  const order = ["Spring 2026", "Summer 2026", "Fall 2026", "Winter 2026", "Spring 2027"];
+  const seen = order.filter(t => inst.terms[t]);
+  return seen.map(t => `<span title="${t}: ${fmtDate(inst.terms[t].start)} – ${fmtDate(inst.terms[t].end)}">${t.split(" ")[0]} ${fmtDate(inst.terms[t].start).split(",")[0]}–${fmtDate(inst.terms[t].end).split(",")[0]}</span>`).join(" · ");
+}
+
+function renderTable() {
+  const items = sortItems(getFiltered());
+  const arrow = (k) => state.sortKey === k ? `<span class="arrow">${state.sortDir === 1 ? "▲" : "▼"}</span>` : "";
+  if (!items.length) {
+    document.getElementById("view").innerHTML = `<div class="empty">No institutions match these filters.</div>`;
+    return;
+  }
+  let h = `<table class="cal"><thead><tr>
+    <th data-sort="name">Institution${arrow("name")}</th>
+    <th data-sort="city">Metro${arrow("city")}</th>
+    <th data-sort="system">System${arrow("system")}</th>
+    <th data-sort="status">Status today${arrow("status")}</th>
+    <th data-sort="remaining" class="days">Days${arrow("remaining")}</th>
+    <th>Current / next term</th>
+    <th>TI Coverage</th>
+  </tr></thead><tbody>`;
+  for (const it of items) {
+    const s = it._status;
+    const editedTag = it._edited ? ` <span class="pill" style="background:#fff7e0;border-color:#e7d09c;color:#6b4d1a">edited</span>` : "";
+    let termCell = "";
+    if (s.state !== "break") {
+      const t = it.terms[s.termName];
+      termCell = `<div><strong>${s.termName}</strong>: ${fmtDate(t.start)} – ${fmtDate(t.end)}</div>`;
+    } else if (s.termName.startsWith("Next:")) {
+      const tn = s.termName.replace("Next: ", "");
+      const t = it.terms[tn];
+      termCell = `<div><strong>${tn}</strong>: ${fmtDate(t.start)} – ${fmtDate(t.end)}</div>`;
+    } else {
+      termCell = `<div class="uni-meta">No upcoming term in dataset</div>`;
+    }
+    termCell += `<div class="terms">${termsSummary(it)}</div>`;
+    const days = s.daysRemaining != null ? s.daysRemaining : (s.daysUntilNext != null ? `+${s.daysUntilNext}` : "—");
+    h += `<tr>
+      <td><div class="uni-name">${it.name}${editedTag}</div><div class="uni-meta"><a href="${it.url}" target="_blank" rel="noopener">official calendar ↗</a></div></td>
+      <td>${it.city}, ${it.state}</td>
+      <td><span class="pill system">${it.system}</span></td>
+      <td>${statusPill(s)}</td>
+      <td class="days">${days}</td>
+      <td>${termCell}</td>
+      <td class="coverage"><div class="ti-bubbles" data-key="${(it.name+"|"+it.city).replace(/"/g,"&quot;")}">${buildBubbles(it.name+"|"+it.city, it._coverage||"")}</div></td>
+    </tr>`;
+  }
+  h += `</tbody></table>`;
+  document.getElementById("view").innerHTML = h;
+
+  // Sort handlers
+  document.querySelectorAll("th[data-sort]").forEach(th => {
+    th.addEventListener("click", () => {
+      const k = th.dataset.sort;
+      if (state.sortKey === k) state.sortDir *= -1;
+      else { state.sortKey = k; state.sortDir = 1; }
+      render();
+    });
+  });
+}
+
+function renderTimeline() {
+  const items = sortItems(getFiltered());
+  if (!items.length) {
+    document.getElementById("view").innerHTML = `<div class="empty">No institutions match these filters.</div>`;
+    return;
+  }
+  // Window: 60 days before today through 240 days after
+  const winStart = new Date(TODAY); winStart.setDate(winStart.getDate() - 60);
+  const winEnd = new Date(TODAY); winEnd.setDate(winEnd.getDate() + 240);
+  const totalDays = daysBetween(winStart, winEnd);
+  const pctOf = (d) => Math.max(0, Math.min(100, (daysBetween(winStart, d) / totalDays) * 100));
+
+  // Month tick marks
+  let monthTicks = "";
+  const m = new Date(winStart.getFullYear(), winStart.getMonth(), 1);
+  while (m <= winEnd) {
+    const left = pctOf(m);
+    monthTicks += `<div class="tl-month" style="left:${left}%">${m.toLocaleDateString("en-US",{month:"short",year:"2-digit"})}</div>`;
+    m.setMonth(m.getMonth() + 1);
+  }
+  const todayLeft = pctOf(TODAY);
+
+  let h = `<div class="timeline"><div class="tl-axis"><div class="left">Institution</div><div class="right">${monthTicks}<div class="tl-today" style="left:${todayLeft}%"><div class="lbl">Today</div></div></div></div>`;
+  for (const it of items) {
+    let bars = "";
+    for (const [name, t] of Object.entries(it.terms)) {
+      if (!t.start || !t.end) continue;
+      const s = parseDate(t.start), e = parseDate(t.end);
+      if (e < winStart || s > winEnd) continue;
+      const cls = name.toLowerCase().includes("spring") ? "spring"
+        : name.toLowerCase().includes("summer") ? "summer"
+        : name.toLowerCase().includes("fall") ? "fall"
+        : name.toLowerCase().includes("winter") ? "winter" : "spring";
+      const left = pctOf(s);
+      const right = pctOf(e);
+      const width = Math.max(0.5, right - left);
+      bars += `<div class="term-bar ${cls}" style="left:${left}%; width:${width}%" title="${name}: ${fmtDate(t.start)} – ${fmtDate(t.end)}">${name}</div>`;
+    }
+    h += `<div class="tl-row"><div class="label"><div class="uni-name">${it.name}</div><div class="uni-meta">${it.city}, ${it.state} · ${it.system}</div></div><div class="track">${bars}<div class="tl-today" style="left:${todayLeft}%"></div></div></div>`;
+  }
+  h += `</div>`;
+  document.getElementById("view").innerHTML = h;
+  const hh = document.querySelector('header.app-header').offsetHeight;
+  const axisEl = document.querySelector('.tl-axis');
+  if (axisEl) axisEl.style.top = hh + 'px';
+}
+
+// ======================================================
+// MAP VIEW
+// ======================================================
+const CITY_COORDS = {
+  "New York": [40.728, -73.985],
+  "Los Angeles": [34.052, -118.244],
+  "Chicago": [41.878, -87.630],
+  "Dallas-Fort Worth": [32.777, -96.797],
+  "Houston": [29.760, -95.370],
+  "Atlanta": [33.749, -84.388],
+  "Washington DC": [38.907, -77.037],
+  "Philadelphia": [39.953, -75.165],
+  "Miami": [25.762, -80.192],
+  "Phoenix": [33.448, -112.074],
+  "Boston": [42.360, -71.059],
+  "Inland Empire": [33.953, -117.396],
+  "San Francisco Bay Area": [37.775, -122.419],
+  "Detroit": [42.331, -83.046],
+  "Seattle": [47.606, -122.332],
+  "Minneapolis-St. Paul": [44.978, -93.265],
+  "Tampa": [27.951, -82.457],
+  "San Diego": [32.716, -117.161],
+  "Denver": [39.739, -104.990],
+  "Baltimore": [39.290, -76.612],
+  "St. Louis": [38.627, -90.199],
+  "Orlando": [28.538, -81.379],
+  "Charlotte": [35.227, -80.843],
+  "San Antonio": [29.424, -98.494],
+  "Portland": [45.515, -122.678],
+  "Ithaca": [42.444, -76.501],
+  "Hanover": [43.702, -72.289],
+  "Nashville": [36.175, -86.768],
+  "Pittsburgh": [40.441, -79.996],
+  "Salt Lake City": [40.761, -111.891],
+  "Blacksburg": [37.229, -80.414],
+  "Columbus": [39.961, -82.999]
+};
+
+const AIRPORT_CODES = {
+  "New York": "JFK", "Los Angeles": "LAX", "Chicago": "ORD",
+  "Dallas-Fort Worth": "DFW", "Houston": "IAH", "Atlanta": "ATL",
+  "Washington DC": "DCA", "Philadelphia": "PHL", "Miami": "MIA",
+  "Phoenix": "PHX", "Boston": "BOS", "Inland Empire": "ONT",
+  "San Francisco Bay Area": null,
+  "Detroit": "DTW", "Seattle": "SEA", "Minneapolis-St. Paul": "MSP",
+  "Tampa": "TPA", "San Diego": "SAN", "Denver": "DEN",
+  "Baltimore": "BWI", "St. Louis": "STL", "Orlando": "MCO",
+  "Charlotte": "CLT", "San Antonio": "SAT", "Portland": "PDX",
+  "Ithaca": "ITH", "Hanover": "BOS", "Nashville": "BNA",
+  "Pittsburgh": "PIT", "Salt Lake City": "SLC",
+  "Blacksburg": "ROA", "Columbus": "CMH"
+};
+
+let _leafletMap = null;
+let _leafletMarkers = [];
+
+function renderMap() {
+  if (!_leafletMap) {
+    const americasBounds = L.latLngBounds(L.latLng(-60, -170), L.latLng(75, -30));
+    _leafletMap = L.map("leaflet-map", {
+      maxBounds: americasBounds,
+      maxBoundsViscosity: 1.0,
+      minZoom: 3,
+      maxZoom: 12
+    }).setView([38.5, -96.5], 4);
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
+      maxZoom: 12
+    }).addTo(_leafletMap);
+  }
+  _leafletMarkers.forEach(m => m.remove());
+  _leafletMarkers = [];
+
+  // Group all institutions by city (always use full dataset for metro view)
+  const allItems = INSTITUTIONS.map(applyEdits).map(i => ({ ...i, _status: statusOf(i) }));
+  const byCity = {};
+  for (const it of allItems) {
+    if (!byCity[it.city]) byCity[it.city] = [];
+    byCity[it.city].push(it);
+  }
+
+  for (const [city, schools] of Object.entries(byCity)) {
+    const coords = CITY_COORDS[city];
+    if (!coords) continue;
+
+    const inSession = schools.filter(s => s._status.state === "in-session").length;
+    const finals   = schools.filter(s => s._status.state === "finals").length;
+    const summer   = schools.filter(s => s._status.state === "summer").length;
+    const onBreak  = schools.filter(s => s._status.state === "break").length;
+    const total    = schools.length;
+
+    const isSFO = city === "San Francisco Bay Area";
+    const airport = AIRPORT_CODES[city];
+    const flightUrl = airport
+      ? `https://www.google.com/travel/flights?q=flights+from+SFO+to+${airport}`
+      : `https://www.google.com/travel/flights?q=flights+from+San+Francisco+to+${encodeURIComponent(city)}`;
+
+    const rows = [
+      inSession > 0 ? `<div><span style="color:#7c3aed">●</span> <strong>${inSession}</strong> in session</div>` : "",
+      finals   > 0 ? `<div><span style="color:#b44a1a">●</span> <strong>${finals}</strong> in finals</div>` : "",
+      summer   > 0 ? `<div><span style="color:#2c5b85">●</span> <strong>${summer}</strong> in summer</div>` : "",
+      onBreak  > 0 ? `<div><span style="color:#aaa9a0">●</span> <strong>${onBreak}</strong> on break</div>` : "",
+    ].join("");
+
+    const flightBtn = isSFO
+      ? `<div style="font-size:11px;color:#6b6b6b;text-align:center;padding-top:4px">Home airport</div>`
+      : `<a href="${flightUrl}" target="_blank" rel="noopener" style="display:block;background:#1a1a1a;color:#fff;text-align:center;padding:7px 10px;border-radius:5px;text-decoration:none;font-size:12px;font-weight:500">Check flights from SFO →</a>`;
+
+    const escapedCity = city.replace(/'/g, "\\'");
+    const popup = `<div style="min-width:190px;font-size:13px">
+      <div style="font-weight:600;font-size:14px;margin-bottom:2px">${city}</div>
+      <div style="color:#6b6b6b;font-size:11px;margin-bottom:8px">${total} schools tracked</div>
+      <div style="line-height:1.8">${rows}</div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">
+        ${flightBtn}
+        <button onclick="goToSchools('${escapedCity}')" style="background:#fff;border:1px solid #d6d3cb;color:#1a1a1a;padding:7px 10px;border-radius:5px;font-size:12px;font-weight:500;cursor:pointer;width:100%">See schools →</button>
+      </div>
+    </div>`;
+
+    // Purple dot with in-session counter
+    const size = 36;
+    const fontSize = inSession >= 10 ? 11 : 13;
+    const dotHtml = `<div style="width:${size}px;height:${size}px;background:#7c3aed;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:${fontSize}px;font-family:'Geist Mono',monospace;border:2.5px solid rgba(255,255,255,0.9);box-shadow:0 2px 8px rgba(124,58,237,0.45);cursor:pointer">${inSession}</div>`;
+    const icon = L.divIcon({ html: dotHtml, className: "", iconSize: [size, size], iconAnchor: [size/2, size/2], popupAnchor: [0, -(size/2)] });
+    const marker = L.marker(coords, { icon }).addTo(_leafletMap);
+    marker.bindPopup(popup, { maxWidth: 240 });
+    _leafletMarkers.push(marker);
+  }
+
+  setTimeout(() => _leafletMap.invalidateSize(), 50);
+}
+
+function goToSchools(city) {
+  state.view = "table";
+  state.metro = city;
+  document.getElementById("metroFilter").value = city;
+  document.querySelectorAll("#viewSeg button").forEach(b => {
+    b.classList.toggle("active", b.dataset.view === "table");
+  });
+  render();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function render() {
+  renderHeader();
+  const mapEl = document.getElementById("map-container");
+  const viewEl = document.getElementById("view");
+  const controlsEl = document.getElementById("controls");
+  const headerEl = document.getElementById("appHeader");
+  if (state.view === "map") {
+    controlsEl.style.display = "none";
+    viewEl.style.display = "none";
+    mapEl.style.display = "block";
+    const hh = headerEl.offsetHeight;
+    document.getElementById("leaflet-map").style.height = (window.innerHeight - hh - 36) + "px";
+    renderMap();
+  } else {
+    const hh = headerEl.offsetHeight;
+    controlsEl.style.display = "";
+    controlsEl.style.top = hh + "px";
+    mapEl.style.display = "none";
+    viewEl.style.display = "";
+    renderTable();
+  }
+}
+
+// ======================================================
+// EVENTS
+// ======================================================
+document.getElementById("search").addEventListener("input", e => { state.search = e.target.value; render(); });
+document.getElementById("metroFilter").addEventListener("change", e => { state.metro = e.target.value; render(); });
+document.getElementById("systemFilter").addEventListener("change", e => { state.system = e.target.value; render(); });
+document.getElementById("statusFilter").addEventListener("change", e => { state.status = e.target.value; render(); });
+document.querySelectorAll("#viewSeg button").forEach(b => {
+  b.addEventListener("click", () => {
+    document.querySelectorAll("#viewSeg button").forEach(x => x.classList.remove("active"));
+    b.classList.add("active");
+    state.view = b.dataset.view;
+    render();
+  });
+});
+document.getElementById("exportEdits").addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify(EDITS, null, 2)], {type: "application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "university-calendar-edits.json";
+  a.click(); URL.revokeObjectURL(url);
+  toast("Exported your edits");
+});
+document.getElementById("resetEdits").addEventListener("click", () => {
+  if (Object.keys(EDITS).length === 0) { toast("No edits to reset"); return; }
+  if (!confirm("Reset all your edits?")) return;
+  EDITS = {}; saveEdits(EDITS); render(); toast("Edits cleared");
+});
+
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(window._toastT);
+  window._toastT = setTimeout(() => t.classList.remove("show"), 1800);
+}
+
+document.getElementById("tiFilter").addEventListener("change", e => { state.ti = e.target.value; render(); });
+
+// Populate dropdowns
+(function init() {
+  const metroSel = document.getElementById("metroFilter");
+  for (const m of getMetros()) {
+    const o = document.createElement("option"); o.value = m; o.textContent = m; metroSel.appendChild(o);
+  }
+  const tiSel = document.getElementById("tiFilter");
+  for (const ti of TI_TEAM) {
+    const o = document.createElement("option"); o.value = ti.initials; o.textContent = ti.name; tiSel.appendChild(o);
+  }
+  render();
+})();
+</script>
+</body>
+</html>
