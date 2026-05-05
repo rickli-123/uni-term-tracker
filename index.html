@@ -294,6 +294,41 @@
 <div id="toast"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+const SUPABASE_URL = "https://akiynxkyudetficsipkr.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFraXlueGt5dWRldGZpY3NpcGtyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4MzY4NzQsImV4cCI6MjA5MzQxMjg3NH0.5lTVsiXkBjRxy1IqPVj0duQ7OLAEagxL_kJX2L8geZ4";
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+async function loadFromSupabase() {
+  const { data, error } = await db.from("coverage").select("*");
+  if (error) { console.warn("Supabase load error:", error); return; }
+  // Clear all coverage first so unchecked bubbles sync correctly
+  for (const key of Object.keys(EDITS)) {
+    delete EDITS[key].__coverage;
+    if (!Object.keys(EDITS[key]).length) delete EDITS[key];
+  }
+  // Re-populate from Supabase
+  for (const row of data) {
+    if (row.initials) {
+      if (!EDITS[row.school_key]) EDITS[row.school_key] = {};
+      EDITS[row.school_key].__coverage = row.initials;
+    }
+  }
+  saveEdits(EDITS);
+  render();
+}
+
+async function saveCoverageToSupabase(key, initialsStr) {
+  let result;
+  if (initialsStr) {
+    result = await db.from("coverage").upsert({ school_key: key, initials: initialsStr });
+  } else {
+    result = await db.from("coverage").delete().eq("school_key", key);
+  }
+  if (result.error) console.error("Supabase write error:", result.error);
+}
+</script>
 <script>
 // ======================================================
 // DATASET
@@ -614,7 +649,6 @@ const SF_INSTS = [
   { name:"Santa Clara University", city:SF, state:"CA", type:"Private R2", system:"quarter", url:"https://www.scu.edu/registrar/academic-calendars/", terms: cp(TPL_QTR_PRIV) },
   { name:"University of San Francisco (USF)", city:SF, state:"CA", type:"Private R2", system:"semester", url:"https://www.usfca.edu/academic-calendar", terms: cp(TPL_SEM_CSU) },
   { name:"Saint Mary's College of California", city:SF, state:"CA", type:"Private", system:"semester", url:"https://www.stmarys-ca.edu/academic-calendar", terms: cp(TPL_SEM_CSU) },
-  { name:"Mills College at Northeastern", city:SF, state:"CA", type:"Private", system:"semester", url:"https://www.mills.edu/registrar/academic-calendar.php", terms: cp(TPL_SEM_CSU) },
   { name:"California College of the Arts (CCA)", city:SF, state:"CA", type:"Private specialty", system:"semester", url:"https://www.cca.edu/academics/calendar/", terms: cp(TPL_SEM_CSU) },
   { name:"San Francisco Conservatory of Music", city:SF, state:"CA", type:"Private specialty", system:"semester", url:"https://sfcm.edu/academics/calendar", terms: cp(TPL_SEM_LATE) },
   { name:"City College of San Francisco", city:SF, state:"CA", type:"Public CC", system:"semester", url:"https://www.ccsf.edu/academics/academic-calendar", terms: cp(TPL_SEM_CACC) },
@@ -836,26 +870,26 @@ const PDX_INSTS = [
 // =====================================================================
 const ELITE_OTHER_INSTS = [
   // Standalone metros (too far from any existing metro for a same-trip visit)
-  { name:"Cornell University", city:"Ithaca", state:"NY", type:"Private R1", system:"semester", url:"https://registrar.cornell.edu/academic-calendar", terms: { "Spring 2026": {start:"2026-01-21",end:"2026-05-22"}, "Summer 2026": {start:"2026-05-26",end:"2026-08-14"}, "Fall 2026": {start:"2026-08-26",end:"2026-12-17"} } },
-  { name:"Dartmouth College", city:"Hanover", state:"NH", type:"Private R1", system:"quarter", url:"https://registrar.dartmouth.edu/calendars/academic-calendar", terms: { "Winter 2026": {start:"2026-01-05",end:"2026-03-13"}, "Spring 2026": {start:"2026-03-30",end:"2026-06-05"}, "Summer 2026": {start:"2026-06-22",end:"2026-09-04"}, "Fall 2026": {start:"2026-09-14",end:"2026-11-22"} } },
-  { name:"Vanderbilt University", city:"Nashville", state:"TN", type:"Private R1", system:"semester", url:"https://registrar.vanderbilt.edu/calendars/academic-calendar.php", terms: { "Spring 2026": {start:"2026-01-12",end:"2026-05-08"}, "Summer 2026": {start:"2026-05-26",end:"2026-08-07"}, "Fall 2026": {start:"2026-08-25",end:"2026-12-17"} } },
-  { name:"Carnegie Mellon University", city:"Pittsburgh", state:"PA", type:"Private R1", system:"semester", url:"https://www.cmu.edu/hub/registrar/academic-calendar/", terms: { "Spring 2026": {start:"2026-01-13",end:"2026-05-10"}, "Summer 2026": {start:"2026-05-18",end:"2026-08-07"}, "Fall 2026": {start:"2026-08-25",end:"2026-12-15"} } },
-  { name:"Brigham Young University (BYU)", city:"Salt Lake City", state:"UT", type:"Private R1", system:"semester", url:"https://registrar.byu.edu/academic-calendar", terms: { "Winter 2026": {start:"2026-01-05",end:"2026-04-23"}, "Spring 2026": {start:"2026-04-27",end:"2026-06-11"}, "Summer 2026": {start:"2026-06-15",end:"2026-07-30"}, "Fall 2026": {start:"2026-09-02",end:"2026-12-17"} } },
-  { name:"Virginia Tech", city:"Blacksburg", state:"VA", type:"Public R1", system:"semester", url:"https://www.registrar.vt.edu/dates-deadlines-public/academic-calendar.html", terms: { "Spring 2026": {start:"2026-01-20",end:"2026-05-08"}, "Summer 2026": {start:"2026-05-18",end:"2026-08-07"}, "Fall 2026": {start:"2026-08-24",end:"2026-12-18"} } },
-  { name:"Ohio State University", city:"Columbus", state:"OH", type:"Public R1", system:"semester", url:"https://registrar.osu.edu/academic-calendar/", terms: { "Spring 2026": {start:"2026-01-12",end:"2026-04-30"}, "Summer 2026": {start:"2026-05-11",end:"2026-08-07"}, "Fall 2026": {start:"2026-08-25",end:"2026-12-13"} } },
-  // Grouped into nearby metros (realistic same-trip distance)
-  { name:"Duke University", city:"Charlotte", state:"NC", type:"Private R1", system:"semester", url:"https://registrar.duke.edu/academic-calendars", terms: { "Spring 2026": {start:"2026-01-07",end:"2026-05-03"}, "Summer 2026": {start:"2026-05-18",end:"2026-08-07"}, "Fall 2026": {start:"2026-08-25",end:"2026-12-19"} } },
-  { name:"University of North Carolina at Chapel Hill", city:"Charlotte", state:"NC", type:"Public R1", system:"semester", url:"https://registrar.unc.edu/academic-calendar/", terms: { "Spring 2026": {start:"2026-01-07",end:"2026-05-03"}, "Summer 2026": {start:"2026-05-18",end:"2026-08-07"}, "Fall 2026": {start:"2026-08-19",end:"2026-12-14"} } },
-  { name:"Brown University", city:"Boston", state:"RI", type:"Private R1", system:"semester", url:"https://www.brown.edu/about/administration/registrar/academic-calendar", terms: { "Spring 2026": {start:"2026-01-22",end:"2026-05-22"}, "Summer 2026": {start:"2026-06-01",end:"2026-08-14"}, "Fall 2026": {start:"2026-09-03",end:"2026-12-20"} } },
-  { name:"University of Notre Dame", city:"Chicago", state:"IN", type:"Private R1", system:"semester", url:"https://registrar.nd.edu/calendars/academic-calendar/", terms: { "Spring 2026": {start:"2026-01-12",end:"2026-05-09"}, "Summer 2026": {start:"2026-05-18",end:"2026-08-07"}, "Fall 2026": {start:"2026-08-24",end:"2026-12-17"} } },
-  { name:"University of Wisconsin-Madison", city:"Chicago", state:"WI", type:"Public R1", system:"semester", url:"https://registrar.wisc.edu/dates-deadlines/", terms: { "Spring 2026": {start:"2026-01-21",end:"2026-05-15"}, "Summer 2026": {start:"2026-06-01",end:"2026-08-14"}, "Fall 2026": {start:"2026-09-02",end:"2026-12-22"} } },
-  { name:"Indiana University Bloomington", city:"Chicago", state:"IN", type:"Public R1", system:"semester", url:"https://registrar.indiana.edu/calendars/", terms: cp(TPL_SEM_STD) },
-  { name:"Purdue University", city:"Chicago", state:"IN", type:"Public R1", system:"semester", url:"https://www.purdue.edu/registrar/calendars/", terms: cp(TPL_SEM_STD) },
-  { name:"University of Illinois Urbana-Champaign", city:"Chicago", state:"IL", type:"Public R1", system:"semester", url:"https://registrar.illinois.edu/academic-calendars/", terms: { "Spring 2026": {start:"2026-01-20",end:"2026-05-13"}, "Summer 2026": {start:"2026-06-01",end:"2026-08-07"}, "Fall 2026": {start:"2026-08-24",end:"2026-12-19"} } },
-  { name:"University of Texas at Austin", city:"Dallas-Fort Worth", state:"TX", type:"Public R1", system:"semester", url:"https://registrar.utexas.edu/calendars/academic", terms: { "Spring 2026": {start:"2026-01-13",end:"2026-05-16"}, "Summer 2026": {start:"2026-06-01",end:"2026-08-14"}, "Fall 2026": {start:"2026-08-24",end:"2026-12-14"} } },
-  { name:"Pennsylvania State University", city:"Philadelphia", state:"PA", type:"Public R1", system:"semester", url:"https://registrar.psu.edu/academic-calendar/", terms: cp(TPL_SEM_STD) },
-  { name:"University of Virginia", city:"Washington DC", state:"VA", type:"Public R1", system:"semester", url:"https://registrar.virginia.edu/academic-calendar", terms: { "Spring 2026": {start:"2026-01-13",end:"2026-05-09"}, "Summer 2026": {start:"2026-05-18",end:"2026-08-07"}, "Fall 2026": {start:"2026-08-26",end:"2026-12-19"} } },
-  { name:"University of Florida", city:"Tampa", state:"FL", type:"Public R1", system:"semester", url:"https://registrar.ufl.edu/calendars/", terms: cp(TPL_SEM_STD) },
+  { name:"Cornell University", city:"Ithaca", state:"NY", type:"Private R1", system:"semester", loc:[42.4534,-76.4735], url:"https://registrar.cornell.edu/academic-calendar", terms: { "Spring 2026": {start:"2026-01-21",end:"2026-05-22"}, "Summer 2026": {start:"2026-05-26",end:"2026-08-14"}, "Fall 2026": {start:"2026-08-26",end:"2026-12-17"} } },
+  { name:"Dartmouth College", city:"Hanover", state:"NH", type:"Private R1", system:"quarter", loc:[43.7044,-72.2887], url:"https://registrar.dartmouth.edu/calendars/academic-calendar", terms: { "Winter 2026": {start:"2026-01-05",end:"2026-03-13"}, "Spring 2026": {start:"2026-03-30",end:"2026-06-05"}, "Summer 2026": {start:"2026-06-22",end:"2026-09-04"}, "Fall 2026": {start:"2026-09-14",end:"2026-11-22"} } },
+  { name:"Vanderbilt University", city:"Nashville", state:"TN", type:"Private R1", system:"semester", loc:[36.1447,-86.8027], url:"https://registrar.vanderbilt.edu/calendars/academic-calendar.php", terms: { "Spring 2026": {start:"2026-01-12",end:"2026-05-08"}, "Summer 2026": {start:"2026-05-26",end:"2026-08-07"}, "Fall 2026": {start:"2026-08-25",end:"2026-12-17"} } },
+  { name:"Carnegie Mellon University", city:"Pittsburgh", state:"PA", type:"Private R1", system:"semester", loc:[40.4433,-79.9436], url:"https://www.cmu.edu/hub/registrar/academic-calendar/", terms: { "Spring 2026": {start:"2026-01-13",end:"2026-05-10"}, "Summer 2026": {start:"2026-05-18",end:"2026-08-07"}, "Fall 2026": {start:"2026-08-25",end:"2026-12-15"} } },
+  { name:"Brigham Young University (BYU)", city:"Salt Lake City", state:"UT", type:"Private R1", system:"semester", loc:[40.2518,-111.6493], url:"https://registrar.byu.edu/academic-calendar", terms: { "Winter 2026": {start:"2026-01-05",end:"2026-04-23"}, "Spring 2026": {start:"2026-04-27",end:"2026-06-11"}, "Summer 2026": {start:"2026-06-15",end:"2026-07-30"}, "Fall 2026": {start:"2026-09-02",end:"2026-12-17"} } },
+  { name:"Virginia Tech", city:"Blacksburg", state:"VA", type:"Public R1", system:"semester", loc:[37.2284,-80.4234], url:"https://www.registrar.vt.edu/dates-deadlines-public/academic-calendar.html", terms: { "Spring 2026": {start:"2026-01-20",end:"2026-05-08"}, "Summer 2026": {start:"2026-05-18",end:"2026-08-07"}, "Fall 2026": {start:"2026-08-24",end:"2026-12-18"} } },
+  { name:"Ohio State University", city:"Columbus", state:"OH", type:"Public R1", system:"semester", loc:[40.0067,-83.0305], url:"https://registrar.osu.edu/academic-calendar/", terms: { "Spring 2026": {start:"2026-01-12",end:"2026-04-30"}, "Summer 2026": {start:"2026-05-11",end:"2026-08-07"}, "Fall 2026": {start:"2026-08-25",end:"2026-12-13"} } },
+  // Grouped into nearby metros (realistic same-trip distance) — loc pins real campus
+  { name:"Duke University", city:"Charlotte", state:"NC", type:"Private R1", system:"semester", loc:[36.0015,-78.9382], url:"https://registrar.duke.edu/academic-calendars", terms: { "Spring 2026": {start:"2026-01-07",end:"2026-05-03"}, "Summer 2026": {start:"2026-05-18",end:"2026-08-07"}, "Fall 2026": {start:"2026-08-25",end:"2026-12-19"} } },
+  { name:"University of North Carolina at Chapel Hill", city:"Charlotte", state:"NC", type:"Public R1", system:"semester", loc:[35.9049,-79.0469], url:"https://registrar.unc.edu/academic-calendar/", terms: { "Spring 2026": {start:"2026-01-07",end:"2026-05-03"}, "Summer 2026": {start:"2026-05-18",end:"2026-08-07"}, "Fall 2026": {start:"2026-08-19",end:"2026-12-14"} } },
+  { name:"Brown University", city:"Boston", state:"RI", type:"Private R1", system:"semester", loc:[41.8268,-71.4025], url:"https://www.brown.edu/about/administration/registrar/academic-calendar", terms: { "Spring 2026": {start:"2026-01-22",end:"2026-05-22"}, "Summer 2026": {start:"2026-06-01",end:"2026-08-14"}, "Fall 2026": {start:"2026-09-03",end:"2026-12-20"} } },
+  { name:"University of Notre Dame", city:"Chicago", state:"IN", type:"Private R1", system:"semester", loc:[41.7052,-86.2352], url:"https://registrar.nd.edu/calendars/academic-calendar/", terms: { "Spring 2026": {start:"2026-01-12",end:"2026-05-09"}, "Summer 2026": {start:"2026-05-18",end:"2026-08-07"}, "Fall 2026": {start:"2026-08-24",end:"2026-12-17"} } },
+  { name:"University of Wisconsin-Madison", city:"Chicago", state:"WI", type:"Public R1", system:"semester", loc:[43.0762,-89.4125], url:"https://registrar.wisc.edu/dates-deadlines/", terms: { "Spring 2026": {start:"2026-01-21",end:"2026-05-15"}, "Summer 2026": {start:"2026-06-01",end:"2026-08-14"}, "Fall 2026": {start:"2026-09-02",end:"2026-12-22"} } },
+  { name:"Indiana University Bloomington", city:"Chicago", state:"IN", type:"Public R1", system:"semester", loc:[39.1682,-86.5230], url:"https://registrar.indiana.edu/calendars/", terms: cp(TPL_SEM_STD) },
+  { name:"Purdue University", city:"Chicago", state:"IN", type:"Public R1", system:"semester", loc:[40.4259,-86.9081], url:"https://www.purdue.edu/registrar/calendars/", terms: cp(TPL_SEM_STD) },
+  { name:"University of Illinois Urbana-Champaign", city:"Chicago", state:"IL", type:"Public R1", system:"semester", loc:[40.1020,-88.2272], url:"https://registrar.illinois.edu/academic-calendars/", terms: { "Spring 2026": {start:"2026-01-20",end:"2026-05-13"}, "Summer 2026": {start:"2026-06-01",end:"2026-08-07"}, "Fall 2026": {start:"2026-08-24",end:"2026-12-19"} } },
+  { name:"University of Texas at Austin", city:"Dallas-Fort Worth", state:"TX", type:"Public R1", system:"semester", loc:[30.2849,-97.7341], url:"https://registrar.utexas.edu/calendars/academic", terms: { "Spring 2026": {start:"2026-01-13",end:"2026-05-16"}, "Summer 2026": {start:"2026-06-01",end:"2026-08-14"}, "Fall 2026": {start:"2026-08-24",end:"2026-12-14"} } },
+  { name:"Pennsylvania State University", city:"Philadelphia", state:"PA", type:"Public R1", system:"semester", loc:[40.7982,-77.8599], url:"https://registrar.psu.edu/academic-calendar/", terms: cp(TPL_SEM_STD) },
+  { name:"University of Virginia", city:"Washington DC", state:"VA", type:"Public R1", system:"semester", loc:[38.0336,-78.5080], url:"https://registrar.virginia.edu/academic-calendar", terms: { "Spring 2026": {start:"2026-01-13",end:"2026-05-09"}, "Summer 2026": {start:"2026-05-18",end:"2026-08-07"}, "Fall 2026": {start:"2026-08-26",end:"2026-12-19"} } },
+  { name:"University of Florida", city:"Tampa", state:"FL", type:"Public R1", system:"semester", loc:[29.6436,-82.3549], url:"https://registrar.ufl.edu/calendars/", terms: cp(TPL_SEM_STD) },
 ];
 
 const INSTITUTIONS = [
@@ -925,6 +959,7 @@ function toggleCoverage(key, initials) {
   else delete EDITS[key].__coverage;
   if (!Object.keys(EDITS[key]).length) delete EDITS[key];
   saveEdits(EDITS);
+  saveCoverageToSupabase(key, EDITS[key] ? EDITS[key].__coverage || "" : "");
   document.querySelectorAll(`.ti-bubbles`).forEach(el => {
     if (el.dataset.key === key) el.innerHTML = buildBubbles(key, EDITS[key] ? EDITS[key].__coverage : "");
   });
@@ -1238,7 +1273,104 @@ const AIRPORT_CODES = {
 };
 
 let _leafletMap = null;
-let _leafletMarkers = [];
+let _leafletMarkers = [];  // metro cluster markers
+let _individualMarkers = []; // zoom-in school markers
+let _inZoomMode = false;
+
+// Geocoding cache (Nominatim, 1 req/sec rate limit)
+const GEO_CACHE_KEY = "uni-geo-v2";
+let _geoCache = (() => { try { return JSON.parse(localStorage.getItem(GEO_CACHE_KEY) || "{}"); } catch { return {}; } })();
+let _geoQueue = [];
+let _geoProcessing = false;
+
+function geocodeSchool(inst, cb) {
+  const k = inst.name;
+  if (_geoCache[k] !== undefined) { cb(_geoCache[k]); return; }
+  _geoQueue.push({ inst, cb });
+  drainGeoQueue();
+}
+
+async function drainGeoQueue() {
+  if (_geoProcessing || !_geoQueue.length) return;
+  _geoProcessing = true;
+  while (_geoQueue.length) {
+    const { inst, cb } = _geoQueue.shift();
+    const k = inst.name;
+    if (_geoCache[k] !== undefined) { cb(_geoCache[k]); continue; }
+    try {
+      const q = encodeURIComponent(inst.name + " " + inst.state);
+      const r = await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=us&q=" + q);
+      const d = await r.json();
+      // Prefer results explicitly tagged as a university/college/campus
+      const best = d.find(x => ["university","college","campus","school"].includes(x.type))
+                || d.find(x => x.class === "amenity")
+                || d[0] || null;
+      _geoCache[k] = best ? [+best.lat, +best.lon] : null;
+      try { localStorage.setItem(GEO_CACHE_KEY, JSON.stringify(_geoCache)); } catch {}
+    } catch { _geoCache[k] = null; }
+    cb(_geoCache[k]);
+    await new Promise(r => setTimeout(r, 1100));
+  }
+  _geoProcessing = false;
+}
+
+function clearIndividualMarkers() {
+  _individualMarkers.forEach(m => m.remove());
+  _individualMarkers = [];
+}
+
+function makeSchoolIcon(s) {
+  const bg = s.state === "in-session" ? "#7c3aed"
+    : s.state === "finals" ? "#b44a1a"
+    : s.state === "summer" ? "#2c5b85" : "#aaa9a0";
+  const size = 22;
+  const html = `<div style="width:${size}px;height:${size}px;background:${bg};border-radius:50%;border:2.5px solid rgba(255,255,255,0.92);box-shadow:0 2px 7px rgba(0,0,0,0.28);cursor:pointer"></div>`;
+  return L.divIcon({ html, className: "", iconSize: [size, size], iconAnchor: [size/2, size/2], popupAnchor: [0, -(size/2 + 4)] });
+}
+
+function refreshZoomView() {
+  clearIndividualMarkers();
+  if (!_inZoomMode) return;
+  const allItems = INSTITUTIONS.map(applyEdits).map(i => ({ ...i, _status: statusOf(i) }));
+  const markerByName = {};
+
+  allItems.forEach((inst, idx) => {
+    const mc = CITY_COORDS[inst.city];
+    if (!mc) return;
+
+    // Use hardcoded loc if available, otherwise spiral fallback around metro center
+    let initialPos;
+    if (inst.loc) {
+      initialPos = inst.loc;
+    } else {
+      const angle = (idx * 2.399) % (Math.PI * 2);
+      const r = 0.018 * Math.sqrt((idx % 30) + 1);
+      initialPos = [mc[0] + Math.sin(angle) * r, mc[1] + Math.cos(angle) * r];
+    }
+
+    const s = inst._status;
+    const m = L.marker(initialPos, { icon: makeSchoolIcon(s) }).addTo(_leafletMap);
+    const key = inst.name + "|" + inst.city;
+    const cov = inst._coverage || "";
+    m.bindPopup(`<div style="min-width:160px;font-size:12px;font-family:'Geist Mono',monospace">
+      <div style="font-weight:600;margin-bottom:2px">${inst.name}</div>
+      <div style="color:#6b6b6b;font-size:11px;margin-bottom:6px">${inst.city}, ${inst.state}</div>
+      <div>${statusPill(s)}</div>
+      ${cov ? `<div class="ti-bubbles" data-key="${key.replace(/"/g,"&quot;")}" style="margin-top:8px">${buildBubbles(key, cov)}</div>` : ""}
+      <div style="margin-top:8px"><a href="${inst.url}" target="_blank" rel="noopener" style="color:#2c5b85;font-size:11px">Official calendar ↗</a></div>
+    </div>`, { maxWidth: 240 });
+    _individualMarkers.push(m);
+    markerByName[inst.name] = m;
+
+    // For schools without hardcoded loc, geocode in background to get precise address
+    if (!inst.loc) {
+      geocodeSchool(inst, (geoPos) => {
+        if (!_inZoomMode || !geoPos) return;
+        markerByName[inst.name]?.setLatLng(geoPos);
+      });
+    }
+  });
+}
 
 function renderMap() {
   if (!_leafletMap) {
@@ -1247,13 +1379,28 @@ function renderMap() {
       maxBounds: americasBounds,
       maxBoundsViscosity: 1.0,
       minZoom: 3,
-      maxZoom: 12
+      maxZoom: 18
     }).setView([38.5, -96.5], 4);
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
       attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
-      maxZoom: 12
+      maxZoom: 18
     }).addTo(_leafletMap);
+    _leafletMap.on("zoomend", function() {
+      const z = _leafletMap.getZoom();
+      if (z >= 9) {
+        _inZoomMode = true;
+        _leafletMarkers.forEach(m => { try { m._icon.style.display = "none"; } catch {} });
+        refreshZoomView();
+      } else {
+        _inZoomMode = false;
+        clearIndividualMarkers();
+        _leafletMarkers.forEach(m => { try { m._icon.style.display = ""; } catch {} });
+      }
+    });
   }
+  // If already in zoom mode (individual school view), don't reset — just update size
+  if (_inZoomMode) { setTimeout(() => _leafletMap.invalidateSize(), 50); return; }
+  clearIndividualMarkers();
   _leafletMarkers.forEach(m => m.remove());
   _leafletMarkers = [];
 
@@ -1388,7 +1535,7 @@ function toast(msg) {
 
 document.getElementById("tiFilter").addEventListener("change", e => { state.ti = e.target.value; render(); });
 
-// Populate dropdowns
+// Populate dropdowns and load shared coverage
 (function init() {
   const metroSel = document.getElementById("metroFilter");
   for (const m of getMetros()) {
@@ -1399,6 +1546,10 @@ document.getElementById("tiFilter").addEventListener("change", e => { state.ti =
     const o = document.createElement("option"); o.value = ti.initials; o.textContent = ti.name; tiSel.appendChild(o);
   }
   render();
+  // Load shared coverage from Supabase, then re-render
+  loadFromSupabase();
+  // Poll every 5s so team members see each other's updates quickly
+  setInterval(loadFromSupabase, 5000);
 })();
 </script>
 </body>
